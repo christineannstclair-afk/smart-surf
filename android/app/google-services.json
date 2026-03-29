@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "607370528361",
+    "project_id": "smart-surf-62031",
+    "storage_bucket": "smart-surf-62031.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:607370528361:android:ea205f782743f201a0c4f8",
+        "android_client_info": {
+          "package_name": "com.example.surf_passport"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "607370528361-qk7tcqnciptdmuq0keoq1m5107rur7ne.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADz6CLY2XwVgINgCQwU75IKhmm6W09YrQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "607370528361-qk7tcqnciptdmuq0keoq1m5107rur7ne.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "607370528361-82hb65cj6sg698bfudin26o47t27b7ot.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.surfPassport"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

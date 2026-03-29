@@ -1,0 +1,9 @@
+﻿Analyzing ai_insight_service.dart...                            
+
+   info - Statements in an if should be enclosed in a block - lib\features\session_log\ai_insight_service.dart:105:22 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\session_log\ai_insight_service.dart:106:27 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\session_log\ai_insight_service.dart:107:12 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\session_log\ai_insight_service.dart:243:22 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\session_log\ai_insight_service.dart:244:27 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\session_log\ai_insight_service.dart:245:12 - curly_braces_in_flow_control_structures
+

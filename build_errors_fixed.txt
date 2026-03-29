@@ -1,0 +1,256 @@
+﻿Compiling lib\main.dart for the Web...                          
+flutter : Target 
+dart2js failed: 
+ProcessException: 
+Process exited 
+abnormally with exit 
+code 1:
+At line:1 char:1
++ flutter build web 
+--no-pub 
+--no-wasm-dry-run > 
+build_output.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (Target    
+ dart2js ...th ex    
+it code 1::Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+lib/features/session_
+log/session_log_scree
+n.dart:400:31:
+Error: Can't find 
+')' to match '('.
+                     
+ Expanded(
+                     
+         ^
+lib/features/session_
+log/session_log_scree
+n.dart:400:31:
+Error: Too many 
+positional 
+arguments: 0 
+allowed, but 1 found.
+                     
+ Expanded(
+                     
+         ^
+/C:/flutter/packages/
+flutter/lib/src/widge
+ts/basic.dart:6136:9:
+Info: Found this 
+candidate, but the 
+arguments don't 
+match.
+  const 
+Expanded({super.key, 
+super.flex, required 
+super.child}) : 
+super(fit: 
+FlexFit.tight);
+        ^^^^^^^^
+Error: Compilation 
+failed.
+  Command: C:\flutter
+\bin\cache\dart-sdk\b
+in\dart.exe compile 
+js --platform-binarie
+s=C:\flutter\bin\cach
+e\flutter_web_sdk\ker
+nel --invoker=flutter
+_tool -Ddart.vm.produ
+ct=true -DFLUTTER_VER
+SION=3.41.4 -DFLUTTER
+_CHANNEL=stable -DFLU
+TTER_GIT_URL=https://
+github.com/flutter/fl
+utter.git -DFLUTTER_F
+RAMEWORK_REVISION=ff3
+7bef603 -DFLUTTER_ENG
+INE_REVISION=e4b8dca3
+f1 -DFLUTTER_DART_VER
+SION=3.11.1 -DFLUTTER
+_WEB_USE_SKIA=true -D
+FLUTTER_WEB_USE_SKWAS
+M=false -DFLUTTER_WEB
+_CANVASKIT_URL=https:
+//www.gstatic.com/flu
+tter-canvaskit/e4b8dc
+a3f1b4ede4c3037100244
+1c88c12187ed6/ --nati
+ve-null-assertions 
+--no-source-maps -O4 
+--minify -o C:\Users\
+StCla\smart_surf\.dar
+t_tool\flutter_build\
+273d800ad71fad2dc4175
+8f67d658ba4\app.dill 
+--packages=C:\Users\S
+tCla\smart_surf\.dart
+_tool\package_config.
+json --cfe-only C:\Us
+ers\StCla\smart_surf\
+.dart_tool\flutter_bu
+ild\273d800ad71fad2dc
+41758f67d658ba4\main.
+dart
+#0      RunResult.thr
+owException (package:
+flutter_tools/src/bas
+e/process.dart:153:5)
+#1      _DefaultProce
+ssUtils.run (package:
+flutter_tools/src/bas
+e/process.dart:379:19
+)
+<asynchronous 
+suspension>
+#2      
+Dart2JSTarget.build (
+package:flutter_tools
+/src/build_system/tar
+gets/web.dart:208:5)
+<asynchronous 
+suspension>
+#3      _BuildInstanc
+e._invokeInternal (pa
+ckage:flutter_tools/s
+rc/build_system/build
+_system.dart:937:9)
+<asynchronous 
+suspension>
+#4      Future.wait.<
+anonymous closure> (d
+art:async/future.dart
+:546:21)
+<asynchronous 
+suspension>
+#5      _BuildInstanc
+e.invokeTarget (packa
+ge:flutter_tools/src/
+build_system/build_sy
+stem.dart:875:32)
+<asynchronous 
+suspension>
+#6      Future.wait.<
+anonymous closure> (d
+art:async/future.dart
+:546:21)
+<asynchronous 
+suspension>
+#7      _BuildInstanc
+e.invokeTarget (packa
+ge:flutter_tools/src/
+build_system/build_sy
+stem.dart:875:32)
+<asynchronous 
+suspension>
+#8      FlutterBuildS
+ystem.build (package:
+flutter_tools/src/bui
+ld_system/build_syste
+m.dart:684:16)
+<asynchronous 
+suspension>
+#9      
+WebBuilder.buildWeb (
+package:flutter_tools
+/src/web/compile.dart
+:107:34)
+<asynchronous 
+suspension>
+#10     BuildWebComma
+nd.runCommand (packag
+e:flutter_tools/src/c
+ommands/build_web.dar
+t:300:5)
+<asynchronous 
+suspension>
+#11     FlutterComman
+d.run.<anonymous 
+closure> (package:flu
+tter_tools/src/runner
+/flutter_command.dart
+:1590:27)
+<asynchronous 
+suspension>
+#12     AppContext.ru
+n.<anonymous 
+closure> (package:flu
+tter_tools/src/base/c
+ontext.dart:154:19)
+<asynchronous 
+suspension>
+#13     CommandRunner
+.runCommand (package:
+args/command_runner.d
+art:212:13)
+<asynchronous 
+suspension>
+#14     FlutterComman
+dRunner.runCommand.<a
+nonymous closure> (pa
+ckage:flutter_tools/s
+rc/runner/flutter_com
+mand_runner.dart:496:
+9)
+<asynchronous 
+suspension>
+#15     AppContext.ru
+n.<anonymous 
+closure> (package:flu
+tter_tools/src/base/c
+ontext.dart:154:19)
+<asynchronous 
+suspension>
+#16     FlutterComman
+dRunner.runCommand (p
+ackage:flutter_tools/
+src/runner/flutter_co
+mmand_runner.dart:431
+:5)
+<asynchronous 
+suspension>
+#17     FlutterComman
+dRunner.run.<anonymou
+s closure> (package:f
+lutter_tools/src/runn
+er/flutter_command_ru
+nner.dart:307:33)
+<asynchronous 
+suspension>
+#18     
+run.<anonymous 
+closure>.<anonymous 
+closure> (package:flu
+tter_tools/runner.dar
+t:104:11)
+<asynchronous 
+suspension>
+#19     AppContext.ru
+n.<anonymous 
+closure> (package:flu
+tter_tools/src/base/c
+ontext.dart:154:19)
+<asynchronous 
+suspension>
+#20     main (package
+:flutter_tools/execut
+able.dart:103:3)
+<asynchronous 
+suspension>
+
+Compiling lib\main.dart for the Web...                             16.1s
+Error: Failed to 
+compile application 
+for the Web.

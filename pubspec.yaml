@@ -1,0 +1,56 @@
+name: smart_surf
+description: Smart Surf app
+publish_to: "none"
+
+version: 1.0.0+1
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_launcher_icons: ^0.13.1
+  cupertino_icons: ^1.0.8
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
+  shared_preferences: ^2.5.4
+  purchases_flutter: ^9.14.0
+  image: ^4.5.4
+  url_launcher: ^6.3.2
+  image_picker: ^1.2.1
+  share_plus: ^12.0.1
+  screenshot: ^3.0.0
+  path_provider: ^2.1.5
+  video_player: ^2.11.1
+  http: ^1.6.0
+  firebase_core: ^4.5.0
+  firebase_auth: ^6.2.0
+  cloud_firestore: ^6.1.3
+  firebase_storage: ^13.1.0
+  google_sign_in: ^6.2.1
+  sign_in_with_apple: ^6.1.3
+  pdf: ^3.11.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/surf_hero_premium.png
+    - assets/surf_hero_sunset_premium.png
+    - assets/surf_hero_founder_sunset.png
+    - assets/surf_hero_founder_distant.png
+    - assets/surf_sunset_placeholder.png
+    - assets/surf_placeholder_latest_session.png
+    - assets/lang/
+    - assets/icon/app_icon.png
+
+flutter_launcher_icons:
+  android: false
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true

@@ -1,0 +1,5 @@
+content = open('build_debug_full.txt', 'r', encoding='utf-8', errors='ignore').read()
+print("--- START ---")
+print(content[:500])
+print("--- END ---")
+print(content[-2000:])

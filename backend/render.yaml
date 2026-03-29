@@ -1,0 +1,13 @@
+# render.yaml
+# Infrastructure-as-Code configuration for deploying backend to Render.com
+
+services:
+  - type: web
+    name: smart-surf-backend
+    env: python
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false # Set securely in the Render dashboard, never committed
