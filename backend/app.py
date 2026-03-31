@@ -61,7 +61,8 @@ async def analyze_reflection(request: ReflectionRequest):
         print(f"Error calling LLM Service: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Failed to generate AI session reflection.")
+        # Return the actual error message for better diagnostics in Flutter
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/analyze_popup")
 async def analyze_popup(video: UploadFile = File(...)):
