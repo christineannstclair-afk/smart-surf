@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
 
 class AnalyzeApi {
-  // Uses live API in production (TestFlight/App Store), and localhost for active development
+  // Uses live API in production (TestFlight/App Store)
   static const String _baseUrl = 'https://smart-surf-backend.onrender.com';
 
   static Future<Map<String, dynamic>> uploadAndAnalyze(
