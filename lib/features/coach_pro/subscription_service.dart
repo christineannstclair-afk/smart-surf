@@ -13,6 +13,7 @@ abstract class SubscriptionService {
   
   // Surfer Pro
   Future<bool> isSurferProActive();
+  Future<bool> isSurferTrialActive();
   Future<bool> purchaseSurferPro();
   
   Future<bool> restorePurchases();
@@ -38,6 +39,12 @@ class RevenueCatSubscriptionService implements SubscriptionService {
   @override
   Future<bool> isSurferProActive() async {
     return _isEntitlementActive(SubscriptionConfig.entitlementSurferPro);
+  }
+
+  @override
+  Future<bool> isSurferTrialActive() async {
+    // RevenueCat trial detection would go here. For now, return false.
+    return false;
   }
 
   Future<bool> _isEntitlementActive(String entitlementId) async {
@@ -90,6 +97,7 @@ class RevenueCatSubscriptionService implements SubscriptionService {
 class LocalSubscriptionService implements SubscriptionService {
   static const String _coachKey = 'coach_pro_active';
   static const String _surferKey = 'surfer_pro_active';
+  static const String _surferTrialKey = 'surfer_pro_trial';
 
   @override
   Future<void> init() async {}
@@ -107,6 +115,12 @@ class LocalSubscriptionService implements SubscriptionService {
   }
 
   @override
+  Future<bool> isSurferTrialActive() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_surferTrialKey) ?? false;
+  }
+
+  @override
   Future<bool> purchaseCoachPro() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_coachKey, true);
@@ -117,6 +131,7 @@ class LocalSubscriptionService implements SubscriptionService {
   Future<bool> purchaseSurferPro() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_surferKey, true);
+    await prefs.setBool(_surferTrialKey, true); // Assume trial on local purchase
     return true;
   }
 
@@ -132,6 +147,7 @@ class LocalSubscriptionService implements SubscriptionService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_coachKey, false);
     await prefs.setBool(_surferKey, false);
+    await prefs.setBool(_surferTrialKey, false);
     debugPrint('Local subscriptions revoked for testing.');
   }
 }

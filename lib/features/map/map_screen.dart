@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import '../session_log/firebase_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../widgets/micro_tip_banner.dart';
 import '../../widgets/language_menu.dart';
@@ -18,6 +20,7 @@ final ValueChanged<bool> onSetLanguage;
 final List<SurfSpot> spots;
 final ValueChanged<List<SurfSpot>> onSpotsChanged;
 final GlobalKey? mapKey;
+final VoidCallback? onReturnToDashboard;
 
 const MapScreen({
 super.key,
@@ -26,6 +29,7 @@ required this.onSetLanguage,
 required this.spots,
 required this.onSpotsChanged,
 this.mapKey,
+this.onReturnToDashboard,
 });
 
 @override
@@ -33,10 +37,16 @@ State<MapScreen> createState() => _MapScreenState();
 }
 
 class _MapScreenState extends State<MapScreen> {
-final DraggableScrollableController _sheetController =
-DraggableScrollableController();
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
 
-String _t(String en, String es) => widget.isSpanish ? es : en;
+  @override
+  void initState() {
+    super.initState();
+    FirebaseService().logEvent('map_used');
+  }
+
+  String _t(String en, String es) => widget.isSpanish ? es : en;
 
 static const LatLng _initialCenter = LatLng(15.0, 121.0);
 
@@ -138,7 +148,7 @@ final isWide = constraints.maxWidth > 800;
 return Scaffold(
 appBar: isWide
 ? AppBar(
-title: const SmartSurfWordmark(),
+title: SmartSurfWordmark(onTap: widget.onReturnToDashboard),
 titleSpacing: 16,
 centerTitle: false,
 actions: [
@@ -241,9 +251,9 @@ right: 16,
 child: Column(
 crossAxisAlignment: CrossAxisAlignment.start,
 children: [
-const Padding(
+Padding(
 padding: EdgeInsets.only(bottom: 12),
-child: SmartSurfWordmark(),
+child: SmartSurfWordmark(onTap: widget.onReturnToDashboard),
 ),
 Row(
 crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,7 +316,7 @@ builder: (context, scrollController) {
 return Container(
 decoration: BoxDecoration(
 color: Theme.of(context).colorScheme.surface,
-borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
 boxShadow: [
 BoxShadow(
 color: Colors.black.withOpacity(0.15),
@@ -319,14 +329,54 @@ offset: const Offset(0, -2),
 child: Column(
 children: [
 Center(
-child: Container(
-margin: const EdgeInsets.symmetric(vertical: 12),
-width: 40,
-height: 5,
-decoration: BoxDecoration(
-color: Theme.of(context).colorScheme.outlineVariant,
-borderRadius: BorderRadius.circular(3),
-),
+child: GestureDetector(
+  behavior: HitTestBehavior.opaque,
+  onVerticalDragUpdate: (details) {
+    if (_sheetController.isAttached) {
+      final delta = details.primaryDelta ?? 0;
+      final currentSize = _sheetController.size;
+      final screenHeight = MediaQuery.of(context).size.height;
+      if (screenHeight > 0) {
+        _sheetController.jumpTo(
+          (currentSize - (delta / screenHeight)).clamp(0.15, 0.85),
+        );
+      }
+    }
+  },
+  child: SizedBox(
+    height: 48,
+    width: double.infinity,
+    child: Center(
+      child: Container(
+        width: 32,
+        height: 4,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    ),
+  ),
+  onVerticalDragEnd: (details) {
+    if (_sheetController.isAttached) {
+      final currentSize = _sheetController.size;
+      const snapPoints = [0.15, 0.25, 0.85];
+      double nearest = snapPoints.first;
+      double minDelta = (currentSize - nearest).abs();
+      for (final p in snapPoints) {
+        final d = (currentSize - p).abs();
+        if (d < minDelta) {
+          minDelta = d;
+          nearest = p;
+        }
+      }
+      _sheetController.animateTo(
+        nearest,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  },
 ),
 ),
 Expanded(
@@ -480,21 +530,26 @@ color: AppTheme.textPrimary,
 const Divider(height: 1),
 Expanded(
 child: spots.isEmpty
-? Padding(
-padding: const EdgeInsets.all(24),
-child: Text(
-_t(
-'No spots yet. Tap "Add spot" to log your first location.',
-'Aún no hay spots. Toca "Agregar spot" para registrar tu primera ubicación.',
-),
-textAlign: TextAlign.center,
-style: TextStyle(
-color: Theme.of(context).colorScheme.onSurfaceVariant,
-),
-),
-)
+? SingleChildScrollView(
+    controller: controller,
+    physics: const AlwaysScrollableScrollPhysics(),
+    child: Padding(
+      padding: const EdgeInsets.all(48),
+      child: Text(
+        _t(
+          'No spots yet. Tap "Add spot" to log your first location.',
+          'Aún no hay spots. Toca "Agregar spot" para registrar tu primera ubicación.',
+        ),
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    ),
+  )
 : ListView.builder(
 controller: controller,
+physics: const AlwaysScrollableScrollPhysics(),
 itemCount: spots.length,
 padding: const EdgeInsets.only(bottom: 24, left: 16, right: 16),
 itemBuilder: (context, i) {

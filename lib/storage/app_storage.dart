@@ -267,6 +267,14 @@ class AppStorage {
     await prefs.clear();
   }
 
+  static Future<void> clearTourFlags() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('hasSeenMapTip');
+    await prefs.remove('hasSeenSettingsTip');
+    await prefs.remove('hasSeenPassportTip');
+    await prefs.remove('hasSeenDashboardTip');
+  }
+
   static Future<void> hardReset() async {
     final prefs = await SharedPreferences.getInstance();
     // Clear everything including keys we might not track in loadAll

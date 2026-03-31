@@ -7,6 +7,12 @@ class SessionReflection {
   final String aiSummary;
   final String aiProgressPattern;
   final String aiNextFocus;
+  final String? aiSummaryEn;
+  final String? aiSummaryEs;
+  final String? aiProgressPatternEn;
+  final String? aiProgressPatternEs;
+  final String? aiNextFocusEn;
+  final String? aiNextFocusEs;
 
   SessionReflection({
     required this.id,
@@ -17,6 +23,12 @@ class SessionReflection {
     required this.aiSummary,
     required this.aiProgressPattern,
     required this.aiNextFocus,
+    this.aiSummaryEn,
+    this.aiSummaryEs,
+    this.aiProgressPatternEn,
+    this.aiProgressPatternEs,
+    this.aiNextFocusEn,
+    this.aiNextFocusEs,
   });
 
   Map<String, dynamic> toJson() => {
@@ -28,6 +40,12 @@ class SessionReflection {
         'aiSummary': aiSummary,
         'aiProgressPattern': aiProgressPattern,
         'aiNextFocus': aiNextFocus,
+        'aiSummaryEn': aiSummaryEn,
+        'aiSummaryEs': aiSummaryEs,
+        'aiProgressPatternEn': aiProgressPatternEn,
+        'aiProgressPatternEs': aiProgressPatternEs,
+        'aiNextFocusEn': aiNextFocusEn,
+        'aiNextFocusEs': aiNextFocusEs,
       };
 
   static SessionReflection fromJson(Map<String, dynamic> json) {
@@ -40,6 +58,12 @@ class SessionReflection {
       aiSummary: json['aiSummary'] as String? ?? '',
       aiProgressPattern: json['aiProgressPattern'] as String? ?? '',
       aiNextFocus: json['aiNextFocus'] as String? ?? '',
+      aiSummaryEn: json['aiSummaryEn'] as String?,
+      aiSummaryEs: json['aiSummaryEs'] as String?,
+      aiProgressPatternEn: json['aiProgressPatternEn'] as String?,
+      aiProgressPatternEs: json['aiProgressPatternEs'] as String?,
+      aiNextFocusEn: json['aiNextFocusEn'] as String?,
+      aiNextFocusEs: json['aiNextFocusEs'] as String?,
     );
   }
 }

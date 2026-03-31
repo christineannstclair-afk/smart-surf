@@ -31,6 +31,7 @@ class SessionLogEntry {
   final String? mediaPath;
   final String? mediaType; // "image" or "video"
   final String? waveLocation; // "Takeoff", "First section", "Mid-wave", "Closing section"
+  final String? email;
 
   const SessionLogEntry({
     required this.id,
@@ -59,6 +60,7 @@ class SessionLogEntry {
     this.mediaPath,
     this.mediaType,
     this.waveLocation,
+    this.email,
   });
 
   SessionLogEntry copyWith({
@@ -88,6 +90,7 @@ class SessionLogEntry {
     String? mediaPath,
     String? mediaType,
     String? waveLocation,
+    String? email,
   }) {
     return SessionLogEntry(
       id: id ?? this.id,
@@ -116,6 +119,7 @@ class SessionLogEntry {
       mediaPath: mediaPath ?? this.mediaPath,
       mediaType: mediaType ?? this.mediaType,
       waveLocation: waveLocation ?? this.waveLocation,
+      email: email ?? this.email,
     );
   }
 
@@ -146,6 +150,7 @@ class SessionLogEntry {
         'mediaPath': mediaPath,
         'mediaType': mediaType,
         'waveLocation': waveLocation,
+        'email': email,
       };
 
   static SessionLogEntry fromJson(Map<String, dynamic> json) {
@@ -176,6 +181,7 @@ class SessionLogEntry {
       mediaPath: json['mediaPath'] as String?,
       mediaType: json['mediaType'] as String?,
       waveLocation: json['waveLocation'] as String?,
+      email: json['email'] as String?,
     );
   }
 }

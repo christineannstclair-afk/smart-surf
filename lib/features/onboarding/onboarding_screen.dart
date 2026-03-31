@@ -64,6 +64,12 @@ String _friendlyAuthMessage(FirebaseAuthException e) {
       return 'No internet connection. Please try again.';
     case 'missing-fields':
       return 'Email and password are required.';
+    case 'credential-already-in-use':
+      return 'This account is already linked to another user. Signing you in instead.';
+    case 'email-already-in-use':
+      return 'That email is already being used. Try signing in instead of creating a new account.';
+    case 'account-exists-with-different-credential':
+      return 'This email is already associated with another login method.';
     default:
       return e.message ?? 'Authentication failed.';
   }
@@ -155,12 +161,13 @@ return;
 
 final googleAuth = await googleUser.authentication;
 
-final credential = GoogleAuthProvider.credential(
-accessToken: googleAuth.accessToken,
-idToken: googleAuth.idToken,
-);
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
 
-await FirebaseAuth.instance.signInWithCredential(credential);
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      FirebaseService().logEvent('sign_in_google');
 
 if (!mounted) return;
 setState(() => _isSigningIn = false);
@@ -178,11 +185,12 @@ Future<void> _signInWithApple() async {
 try {
 setState(() => _isSigningIn = true);
 
-final appleProvider = AppleAuthProvider();
-appleProvider.addScope('email');
-appleProvider.addScope('name');
+      final appleProvider = AppleAuthProvider();
+      appleProvider.addScope('email');
+      appleProvider.addScope('name');
 
-await FirebaseAuth.instance.signInWithProvider(appleProvider);
+      await FirebaseAuth.instance.signInWithProvider(appleProvider);
+      FirebaseService().logEvent('sign_in_apple');
 
 if (!mounted) return;
 setState(() => _isSigningIn = false);
@@ -288,17 +296,20 @@ Future<void> _signInWithEmail() async {
       );
     }
 
-    if (isLogin) {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-    } else {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-    }
+      if (isLogin) {
+        final credential = EmailAuthProvider.credential(email: email, password: password);
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      } else {
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      }
+
+      FirebaseService().logEvent('sign_in_email', parameters: {'is_new': !isLogin});
 
     if (!mounted) return;
     setState(() => _isSigningIn = false);
@@ -330,10 +341,6 @@ curve: Curves.easeInOut,
 );
 }
 
-void _skipOnboarding() {
-FocusScope.of(context).unfocus();
-widget.onFinish(null, null, null, null);
-}
 
 void _completeOnboarding() {
 FocusScope.of(context).unfocus();
@@ -407,16 +414,6 @@ t("onboarding_continue_email"),
 _signInWithEmail,
 ),
 const Spacer(),
-TextButton(
-onPressed: _isSigningIn ? null : _skipOnboarding,
-child: Text(
-t("onboarding_skip_now"),
-style: TextStyle(
-color: Theme.of(context).colorScheme.onSurfaceVariant,
-fontWeight: FontWeight.bold,
-),
-),
-),
 ],
 ),
 ),

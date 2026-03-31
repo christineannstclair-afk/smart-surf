@@ -13,9 +13,9 @@ class SurfConstants {
   ];
 
   static const List<Map<String, String>> boardOptions = [
-    {"en": "Soft-top 7 to 8 feet", "es": "Soft-top 7 a 8 pies"},
-    {"en": "Soft-top 8–9 ft", "es": "Soft-top 8–9 pies"},
-    {"en": "Soft-top 9–10 ft", "es": "Soft-top 9–10 pies"},
+    {"en": "Soft-top 7 to 8 feet", "es": "Tabla Soft-top 7 a 8 pies"},
+    {"en": "Soft-top 8–9 ft", "es": "Tabla Soft-top 8–9 pies"},
+    {"en": "Soft-top 9–10 ft", "es": "Tabla Soft-top 9–10 pies"},
     {"en": "Longboard", "es": "Longboard"},
     {"en": "Funboard", "es": "Funboard"},
     {"en": "Mid-length", "es": "Mid-length"},
@@ -48,4 +48,40 @@ class SurfConstants {
     {"en": "Barrel positioning", "es": "Posicionamiento en el tubo"},
     {"en": "Aerial foundations", "es": "Fundamentos de aéreos"},
   ];
+  static const List<Map<String, String>> waveLocationOptions = [
+    {"en": "Takeoff", "es": "Despegue"},
+    {"en": "First section", "es": "Primera sección"},
+    {"en": "Mid-wave", "es": "Media ola"},
+    {"en": "Closing section", "es": "Sección final"},
+  ];
+
+  static String getBoardTranslation(String? enValue, bool isSpanish) {
+    if (enValue == null || enValue.isEmpty) return "";
+    final option = boardOptions.firstWhere((o) => o["en"] == enValue, orElse: () => {"en": enValue, "es": enValue});
+    return isSpanish ? option["es"]! : option["en"]!;
+  }
+
+  static String getConditionTranslation(String? enValue, bool isSpanish) {
+    if (enValue == null || enValue.isEmpty) return "";
+    final option = conditionOptions.firstWhere((o) => o["en"] == enValue, orElse: () => {"en": enValue, "es": enValue});
+    return isSpanish ? option["es"]! : option["en"]!;
+  }
+
+  static String getWaveHeightTranslation(String? enValue, bool isSpanish) {
+    if (enValue == null || enValue.isEmpty) return "";
+    final option = waveHeightOptions.firstWhere((o) => o["en"] == enValue, orElse: () => {"en": enValue, "es": enValue});
+    return isSpanish ? option["es"]! : option["en"]!;
+  }
+
+  static String getWaveLocationTranslation(String? enValue, bool isSpanish) {
+    if (enValue == null || enValue.isEmpty) return "";
+    final option = waveLocationOptions.firstWhere((o) => o["en"] == enValue, orElse: () => {"en": enValue, "es": enValue});
+    return isSpanish ? option["es"]! : option["en"]!;
+  }
+
+  static String getFocusSkillTranslation(String? enValue, bool isSpanish) {
+    if (enValue == null || enValue.isEmpty) return "";
+    final option = focusSkillPresets.firstWhere((o) => o["en"] == enValue, orElse: () => {"en": enValue, "es": enValue});
+    return isSpanish ? option["es"]! : option["en"]!;
+  }
 }

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/translation_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'session_log_entry.dart';
@@ -24,6 +25,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../surfer_pro/surfer_pro_paywall.dart';
 import 'ai_insight_service.dart';
+import '../../core/analyze_api.dart';
 
 class SessionLogScreen extends StatefulWidget {
   const SessionLogScreen({
@@ -44,6 +46,7 @@ class SessionLogScreen extends StatefulWidget {
     this.onUnlockSurferPro,
     required this.sessionsThisMonth,
     required this.currentStreak,
+    this.onReturnToDashboard,
   });
 
   final bool isSpanish;
@@ -57,6 +60,7 @@ class SessionLogScreen extends StatefulWidget {
   final String units;
   final List<AiAnalysisResult> aiAnalyses;
   final GlobalKey? addSessionKey;
+  final VoidCallback? onReturnToDashboard;
   final bool seenLogPrompt;
   final VoidCallback onPromptDismissed;
   final VoidCallback? onUnlockSurferPro;
@@ -767,7 +771,10 @@ class _SessionLogScreenState extends State<SessionLogScreen> {
                                     mediaPath: mediaPath,
                                     mediaType: mediaType,
                                     waveLocation: waveLocation,
+                                    email: FirebaseAuth.instance.currentUser?.email,
                                   );
+
+                                  FirebaseService().logEvent('log_session_created');
 
                                   if (mediaPath == null) {
                                     final shouldAddClip = await showModalBottomSheet<bool>(
@@ -849,67 +856,12 @@ class _SessionLogScreenState extends State<SessionLogScreen> {
     }
 
     if (created != null) {
-      // Automatic AI Generation if Pro/Trial
-      if (widget.isSurferPro || true) { // Assuming trial or pro for now as per "isSurferPro" logic elsewhere
-        _showGeneratingInsightLoader(created);
-      } else {
-        widget.onAdd(created);
-        _showSessionLoggedModal(created);
-      }
+      widget.onAdd(created);
+      _showSessionLoggedModal(created);
     }
   }
 
-  Future<void> _showGeneratingInsightLoader(SessionLogEntry entry) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 24),
-            Text(t("Generating surf insight...", "Generando insight de surf...")),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      final insight = AiInsightService.generate(
-        session: entry, 
-        isSpanish: widget.isSpanish, 
-        previousLogs: widget.logs
-      );
-      
-      final updatedEntry = entry.copyWith(
-        aiSummaryEn: insight['summaryEn'],
-        aiProgressPatternEn: insight['patternEn'],
-        aiNextFocusEn: insight['nextFocusEn'],
-        aiSummaryEs: insight['summaryEs'],
-        aiProgressPatternEs: insight['patternEs'],
-        aiNextFocusEs: insight['nextFocusEs'],
-        // Legacy fields for backward compatibility/UI display
-        aiSummary: widget.isSpanish ? insight['summaryEs'] : insight['summaryEn'],
-        aiProgressPattern: widget.isSpanish ? insight['patternEs'] : insight['patternEn'],
-        aiNextFocus: widget.isSpanish ? insight['nextFocusEs'] : insight['nextFocusEn'],
-      );
-      widget.onAdd(updatedEntry);
-      
-      if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context); // Close loader
-      }
-      
-      _showSessionLoggedModal(updatedEntry);
-    } catch (e) {
-      debugPrint("Error generating automatic insight: $e");
-      widget.onAdd(entry);
-      if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context); // Close loader
-      }
-      _showSessionLoggedModal(entry);
-    }
-  }
+  // DELETED: _showGeneratingInsightLoader is now managed inline by _SessionDetailSheet
 
   void _showSessionLoggedModal(SessionLogEntry entry) {
     showDialog(
@@ -925,9 +877,18 @@ class _SessionLogScreenState extends State<SessionLogScreen> {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _SessionDetailSheet.show(context, entry, widget.isSpanish, widget.units, widget.isSurferPro);
+              _SessionDetailSheet.show(
+                context, 
+                session: entry, 
+                isSpanish: widget.isSpanish, 
+                units: widget.units, 
+                isSurferPro: widget.isSurferPro,
+                onAdd: widget.onAdd,
+                logs: widget.logs,
+                autoGenerate: true,
+              );
             },
-            child: Text(t("View Surf Insight", "Ver Insight de Surf")),
+            child: Text(t("Analyze with AI ✨", "Analizar con IA ✨")),
           ),
         ],
       ),
@@ -1042,7 +1003,15 @@ class _SessionLogScreenState extends State<SessionLogScreen> {
                                 units: widget.units,
                                 isSurferPro: widget.isSurferPro,
                                 onDelete: () => widget.onDelete(e.id),
-                                onTap: () => _SessionDetailSheet.show(context, e, widget.isSpanish, widget.units, widget.isSurferPro),
+                                onTap: () => _SessionDetailSheet.show(
+                                  context, 
+                                  session: e, 
+                                  isSpanish: widget.isSpanish, 
+                                  units: widget.units, 
+                                  isSurferPro: widget.isSurferPro,
+                                  onAdd: widget.onAdd,
+                                  logs: widget.logs,
+                                ),
                               );
                             }),
                         ],
@@ -1103,9 +1072,13 @@ class _SessionLogScreenState extends State<SessionLogScreen> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: AppCard(
-        color: Colors.amber.withOpacity(0.05),
+      child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: Colors.amber.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.amber.shade200),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1151,7 +1124,7 @@ class _SessionLogScreenState extends State<SessionLogScreen> {
           children: [
             // Teal background block - Fixed height to ensure 20-30px overhang with 16:9 card
             Container(
-              height: 380, 
+              height: 410, 
               width: double.infinity,
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primary,
@@ -1167,9 +1140,12 @@ class _SessionLogScreenState extends State<SessionLogScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 20),
-                        child: SmartSurfWordmark(isInverse: true), // I'll update the widget to support isInverse
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: SmartSurfWordmark(
+                          isInverse: true,
+                          onTap: widget.onReturnToDashboard,
+                        ),
                       ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1204,7 +1180,7 @@ class _SessionLogScreenState extends State<SessionLogScreen> {
             
             // Media card with specific top offset to place it below greeting
             Positioned(
-              top: 260, 
+              top: 290, 
               left: 16,
               right: 16,
               child: MediaCard(
@@ -1281,7 +1257,7 @@ class _PreSurfCheckInCardState extends State<_PreSurfCheckInCard> {
               final size = m["en"]!;
               final isSelected = selectedWaveSize == size;
               return ChoiceChip(
-                label: Text(size, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                label: Text(t(size, m["es"]!), style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
                 selected: isSelected,
                 onSelected: (val) => setState(() => selectedWaveSize = val ? size : null),
               );
@@ -1656,7 +1632,7 @@ class _CurrentSessionCardState extends State<_CurrentSessionCard> {
                   if (widget.session.board.isNotEmpty)
                     _SessionMeta(
                       icon: Icons.surfing, 
-                      text: PassportPresets.mapValue(isSpanish: widget.isSpanish, units: "", list: PassportPresets.boards, enValue: widget.session.board)
+                      text: SurfConstants.getBoardTranslation(widget.session.board, widget.isSpanish)
                     ),
                 ],
               ),
@@ -1799,19 +1775,13 @@ class _SessionCard extends StatelessWidget {
                       if (session.waveSize.isNotEmpty)
                         _JournalMeta(emoji: "🌊", label: t(session.waveSize, waveSizeTrans)),
                       if (session.board.isNotEmpty)
-                        _JournalMeta(emoji: "🏄", label: PassportPresets.mapValue(isSpanish: isSpanish, units: units, list: PassportPresets.boards, enValue: session.board).split(" · ").first),
+                        _JournalMeta(emoji: "🏄", label: SurfConstants.getBoardTranslation(session.board, isSpanish).split(" · ").first),
                       if (session.durationMins > 0)
                         _JournalMeta(emoji: "⏱", label: "${session.durationMins}m"),
                       if (session.waveLocation != null)
                         _JournalMeta(
                           emoji: "🌊", 
-                          label: t(
-                            session.waveLocation!, 
-                            session.waveLocation == "Takeoff" ? "Despegue" :
-                            session.waveLocation == "First section" ? "Primera sección" :
-                            session.waveLocation == "Mid-wave" ? "Media ola" :
-                            session.waveLocation == "Closing section" ? "Sección final" : session.waveLocation!
-                          )
+                          label: SurfConstants.getWaveLocationTranslation(session.waveLocation, isSpanish),
                         ),
                     ],
                   ),
@@ -1867,20 +1837,37 @@ class _JournalMeta extends StatelessWidget {
   }
 }
 
-class _SessionDetailSheet extends StatelessWidget {
+// _SessionDetailSheet is now a StatefulWidget below
+
+class _SessionDetailSheet extends StatefulWidget {
   final SessionLogEntry session;
   final bool isSpanish;
   final String units;
   final bool isSurferPro;
+  final Function(SessionLogEntry) onAdd;
+  final List<SessionLogEntry> logs;
+  final bool autoGenerate;
 
   const _SessionDetailSheet({
+    super.key,
     required this.session,
     required this.isSpanish,
     required this.units,
     required this.isSurferPro,
+    required this.onAdd,
+    required this.logs,
+    this.autoGenerate = false,
   });
 
-  static void show(BuildContext context, SessionLogEntry session, bool isSpanish, String units, bool isSurferPro) {
+  static void show(BuildContext context, {
+    required SessionLogEntry session, 
+    required bool isSpanish, 
+    required String units, 
+    required bool isSurferPro,
+    required Function(SessionLogEntry) onAdd,
+    required List<SessionLogEntry> logs,
+    bool autoGenerate = false,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1891,11 +1878,111 @@ class _SessionDetailSheet extends StatelessWidget {
         isSpanish: isSpanish,
         units: units,
         isSurferPro: isSurferPro,
+        onAdd: onAdd,
+        logs: logs,
+        autoGenerate: autoGenerate,
       ),
     );
   }
 
-  String t(String en, String es) => isSpanish ? es : en;
+  @override
+  State<_SessionDetailSheet> createState() => _SessionDetailSheetState();
+}
+
+class _SessionDetailSheetState extends State<_SessionDetailSheet> {
+  bool _isGenerating = false;
+  late SessionLogEntry _currentSession;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentSession = widget.session;
+    if (widget.autoGenerate && 
+        widget.isSurferPro && 
+        (_currentSession.aiSummaryEn == null || _currentSession.aiSummaryEn!.isEmpty)) {
+      // Small delay to let the sheet open smoothly before starting heavy work
+      Future.delayed(const Duration(milliseconds: 500), _generateInsight);
+    }
+  }
+
+  String t(String en, String es) => widget.isSpanish ? es : en;
+
+  Future<void> _generateInsight() async {
+    if (_isGenerating) return;
+    if (!widget.isSurferPro) return;
+
+    setState(() => _isGenerating = true);
+
+    try {
+      debugPrint("DetailSheet: CALLING BACKEND...");
+      final aiResult = await AnalyzeApi.analyzeReflection(
+        focus: _currentSession.sessionFocus,
+        workedOn: _currentSession.notes,
+        feltHard: _currentSession.reflectionWhatWasChallenging ?? '',
+        feltGood: _currentSession.reflectionWhatFeltGood ?? '',
+        conditions: _currentSession.reflectionConditions ?? '',
+        notes: _currentSession.notes,
+        language: widget.isSpanish ? 'es' : 'en',
+      );
+
+      final apiSummaryEn = (aiResult['session_insight_en'] ?? (widget.isSpanish ? null : aiResult['session_insight'])) as String?;
+      final apiPatternEn = (aiResult['progress_pattern_en'] ?? (widget.isSpanish ? null : aiResult['progress_pattern'])) as String?;
+      final apiFocusEn = (aiResult['next_session_focus_en'] ?? (widget.isSpanish ? null : aiResult['next_session_focus'])) as String?;
+      
+      final apiSummaryEs = (aiResult['session_insight_es'] ?? (widget.isSpanish ? aiResult['session_insight'] : null)) as String?;
+      final apiPatternEs = (aiResult['progress_pattern_es'] ?? (widget.isSpanish ? aiResult['progress_pattern'] : null)) as String?;
+      final apiFocusEs = (aiResult['next_session_focus_es'] ?? (widget.isSpanish ? aiResult['next_session_focus'] : null)) as String?;
+
+      if ((apiSummaryEn == null || apiSummaryEn.isEmpty) && (apiSummaryEs == null || apiSummaryEs.isEmpty)) {
+        throw Exception("Empty AI response"); 
+      }
+
+      final updated = _currentSession.copyWith(
+        aiSummaryEn: apiSummaryEn,
+        aiProgressPatternEn: apiPatternEn,
+        aiNextFocusEn: apiFocusEn,
+        aiSummaryEs: apiSummaryEs,
+        aiProgressPatternEs: apiPatternEs,
+        aiNextFocusEs: apiFocusEs,
+        aiSummary: widget.isSpanish ? (apiSummaryEs ?? apiSummaryEn) : (apiSummaryEn ?? apiSummaryEs),
+        aiProgressPattern: widget.isSpanish ? (apiPatternEs ?? apiPatternEn) : (apiPatternEn ?? apiPatternEs),
+        aiNextFocus: widget.isSpanish ? (apiFocusEs ?? apiFocusEn) : (apiFocusEn ?? apiFocusEs),
+      );
+
+      if (mounted) {
+        setState(() => _currentSession = updated);
+        widget.onAdd(updated);
+      }
+    } catch (e) {
+      debugPrint("DetailSheet: FALLBACK -> $e");
+      final insight = AiInsightService.generate(
+        session: _currentSession, 
+        isSpanish: widget.isSpanish, 
+        previousLogs: widget.logs
+      );
+      
+      final updated = _currentSession.copyWith(
+        aiSummaryEn: insight['summaryEn'],
+        aiProgressPatternEn: insight['patternEn'],
+        aiNextFocusEn: insight['nextFocusEn'],
+        aiSummaryEs: insight['summaryEs'],
+        aiProgressPatternEs: insight['patternEs'],
+        aiNextFocusEs: insight['nextFocusEs'],
+        aiSummary: widget.isSpanish ? insight['summaryEs'] : insight['summaryEn'],
+        aiProgressPattern: widget.isSpanish ? insight['patternEs'] : insight['patternEn'],
+        aiNextFocus: widget.isSpanish ? insight['nextFocusEs'] : insight['nextFocusEn'],
+      );
+      
+      if (mounted) {
+        setState(() => _currentSession = updated);
+        widget.onAdd(updated);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGenerating = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1927,22 +2014,22 @@ class _SessionDetailSheet extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
-              if (session.mediaPath != null) ...[
+              if (_currentSession.mediaPath != null) ...[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: MediaCard(
-                    isSpanish: isSpanish,
-                    state: session.mediaType == 'video' ? MediaCardState.video : MediaCardState.image,
-                    mediaPath: session.mediaPath,
-                    mediaType: session.mediaType,
+                    isSpanish: widget.isSpanish,
+                    state: _currentSession.mediaType == 'video' ? MediaCardState.video : MediaCardState.image,
+                    mediaPath: _currentSession.mediaPath,
+                    mediaType: _currentSession.mediaType,
                     onTap: () {
-                      if (session.mediaType == 'video' && session.mediaPath != null) {
+                      if (_currentSession.mediaType == 'video' && _currentSession.mediaPath != null) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => VideoPreviewModal(
-                              videoPath: session.mediaPath!,
-                              isSpanish: isSpanish,
+                              videoPath: _currentSession.mediaPath!,
+                              isSpanish: widget.isSpanish,
                             ),
                           ),
                         );
@@ -1956,60 +2043,170 @@ class _SessionDetailSheet extends StatelessWidget {
               _buildInfoGrid(context),
               const Divider(height: 48),
               
-              if (session.sessionFocus.isNotEmpty) ...[
-                _buildField(t("Focus Skill", "Habilidad Foco"), "🎯 " + session.sessionFocus),
+              if (_currentSession.sessionFocus.isNotEmpty) ...[
+                _buildField(t("Focus Skill", "Habilidad Foco"), "🎯 " + SurfConstants.getFocusSkillTranslation(_currentSession.sessionFocus, widget.isSpanish)),
                 const SizedBox(height: 20),
               ],
-              if (session.reflectionConditions?.isNotEmpty == true) ...[
-                _buildField(t("Conditions", "Condiciones"), "☁️ " + session.reflectionConditions!),
+              if (_currentSession.reflectionConditions?.isNotEmpty == true) ...[
+                _buildField(t("Conditions", "Condiciones"), "☁️ " + SurfConstants.getConditionTranslation(_currentSession.reflectionConditions, widget.isSpanish)),
                 const SizedBox(height: 20),
               ],
-              if (session.notes.isNotEmpty) ...[
-                _buildField(t("What were you working on?", "¿En qué estabas trabajando?"), session.notes),
+              if (_currentSession.notes.isNotEmpty) ...[
+                _buildField(t("What were you working on?", "¿En qué estabas trabajando?"), _currentSession.notes),
                 const SizedBox(height: 20),
               ],
-              if (session.reflectionWhatFeltGood?.isNotEmpty == true) ...[
-                _buildField(t("What felt good?", "¿Qué te hizo sentir bien?"), "✨ " + session.reflectionWhatFeltGood!),
+              if (_currentSession.reflectionWhatFeltGood?.isNotEmpty == true) ...[
+                _buildField(t("What felt good?", "¿Qué te hizo sentir bien?"), "✨ " + _currentSession.reflectionWhatFeltGood!),
                 const SizedBox(height: 20),
               ],
-              if (session.reflectionWhatWasChallenging?.isNotEmpty == true) ...[
-                _buildField(t("What was challenging?", "¿Qué fue lo más difícil?"), "🌊 " + session.reflectionWhatWasChallenging!),
+              if (_currentSession.reflectionWhatWasChallenging?.isNotEmpty == true) ...[
+                _buildField(t("What was challenging?", "¿Qué fue lo más difícil?"), "🌊 " + _currentSession.reflectionWhatWasChallenging!),
                 const SizedBox(height: 20),
               ],
-              if (isSurferPro) ...[
-                if (isSpanish) ...[
-                  if (session.aiSummaryEs != null && session.aiSummaryEs!.isNotEmpty) ...[
-                    _buildField(t("Session Insight", "Insight de la Sesión"), session.aiSummaryEs!, isItalic: true, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(height: 20),
-                  ],
-                  if (session.aiProgressPatternEs != null && session.aiProgressPatternEs!.isNotEmpty) ...[
-                    _buildField(t("Progress Pattern", "Patrón de Progreso"), session.aiProgressPatternEs!, isItalic: true, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(height: 20),
-                  ],
-                  if (session.aiNextFocusEs != null && session.aiNextFocusEs!.isNotEmpty) ...[
-                    _buildField(t("Next Session Focus", "Próximo Enfoque"), session.aiNextFocusEs!, isItalic: true, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(height: 20),
-                  ],
-                ] else ...[
-                  if (session.aiSummaryEn != null && session.aiSummaryEn!.isNotEmpty) ...[
-                    _buildField(t("Session Insight", "Session Insight"), session.aiSummaryEn!, isItalic: true, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(height: 20),
-                  ],
-                  if (session.aiProgressPatternEn != null && session.aiProgressPatternEn!.isNotEmpty) ...[
-                    _buildField(t("Progress Pattern", "Progress Pattern"), session.aiProgressPatternEn!, isItalic: true, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(height: 20),
-                  ],
-                  if (session.aiNextFocusEn != null && session.aiNextFocusEn!.isNotEmpty) ...[
-                    _buildField(t("Next Session Focus", "Next Session Focus"), session.aiNextFocusEn!, isItalic: true, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(height: 20),
-                  ],
-                ],
-              ],
+
+              // Clean, Centralized AI Section
+              const Divider(height: 48),
+              _buildAiSection(context),
+
               const SizedBox(height: 40),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAiSection(BuildContext context) {
+    final summary = widget.isSpanish ? _currentSession.aiSummaryEs : _currentSession.aiSummaryEn;
+    final hasInsight = summary != null && summary.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.auto_awesome, color: AppTheme.primary, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              t("AI SURF INSIGHT", "INSIGHT DE SURF IA"),
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+                color: AppTheme.primary,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const Spacer(),
+            if (hasInsight && !_isGenerating)
+               TextButton.icon(
+                onPressed: _generateInsight,
+                icon: const Icon(Icons.refresh, size: 14),
+                label: Text(t("Refresh", "Actualizar"), style: const TextStyle(fontSize: 12)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (_isGenerating)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(height: 16),
+                Text(t("Generating insight...", "Generando insight..."), 
+                  style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+              ],
+            ),
+          )
+        else if (hasInsight)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildField(t("Lesson", "Lección"), summary, isItalic: true, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(height: 20),
+              if ((widget.isSpanish ? _currentSession.aiProgressPatternEs : _currentSession.aiProgressPatternEn)?.isNotEmpty == true) ...[
+                _buildField(t("Pattern", "Patrón"), (widget.isSpanish ? _currentSession.aiProgressPatternEs : _currentSession.aiProgressPatternEn)!, isItalic: true),
+                const SizedBox(height: 20),
+              ],
+              if ((widget.isSpanish ? _currentSession.aiNextFocusEs : _currentSession.aiNextFocusEn)?.isNotEmpty == true) ...[
+                 _buildFocusCard(t("Next Priority", "Próxima Prioridad"), (widget.isSpanish ? _currentSession.aiNextFocusEs : _currentSession.aiNextFocusEn)!, widget.isSpanish),
+              ],
+            ],
+          )
+        else
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  t("Unlock your technical potential with a custom AI insight.", 
+                    "Desbloquea tu potencial técnico con un insight de IA personalizado."),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _generateInsight,
+                    icon: const Icon(Icons.auto_awesome, size: 18),
+                    label: Text(t("Analyze with AI ✨", "Analizar con IA ✨")),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildFocusCard(String title, String content, bool isSpanish) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.track_changes, color: AppTheme.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                title.toUpperCase(),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                  color: AppTheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            content,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, height: 1.5),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2019,27 +2216,25 @@ class _SessionDetailSheet extends StatelessWidget {
       runSpacing: 16,
       children: [
         _buildInfoItem("📅", t("Date", "Fecha"), 
-          "${session.date.year}-${session.date.month.toString().padLeft(2, '0')}-${session.date.day.toString().padLeft(2, '0')}"),
-        if (session.spotName.isNotEmpty && session.spotName != t("Current Session", "Sesión Actual"))
-          _buildInfoItem("📍", t("Location", "Ubicación"), session.spotName),
-        if (session.countryOrRegion.isNotEmpty)
-          _buildInfoItem("🌎", t("Region", "Región"), session.countryOrRegion),
-        if (session.waveSize.isNotEmpty)
-          _buildInfoItem("🌊", t("Waves", "Olas"), session.waveSize),
-        if (session.board.isNotEmpty)
-          _buildInfoItem("🏄", t("Board", "Tabla"), session.board),
-        if (session.durationMins > 0)
-          _buildInfoItem("⏱", t("Duration", "Duración"), "${session.durationMins}m"),
-        if (session.rating > 0)
-          _buildInfoItem("⭐", t("Rating", "Valoración"), "${session.rating}/5"),
-        if (session.waveLocation != null)
-          _buildInfoItem("🌊", t("Wave Context", "Contexto de Ola"), t(
-            session.waveLocation!, 
-            session.waveLocation == "Takeoff" ? "Despegue" :
-            session.waveLocation == "First section" ? "Primera sección" :
-            session.waveLocation == "Mid-wave" ? "Media ola" :
-            session.waveLocation == "Closing section" ? "Sección final" : session.waveLocation!
-          )),
+          "${_currentSession.date.year}-${_currentSession.date.month.toString().padLeft(2, '0')}-${_currentSession.date.day.toString().padLeft(2, '0')}"),
+        if (_currentSession.spotName.isNotEmpty && _currentSession.spotName != t("Current Session", "Sesión Actual"))
+          _buildInfoItem("📍", t("Location", "Ubicación"), _currentSession.spotName == "Location not specified" ? t("Location not specified", "Ubicación no especificada") : _currentSession.spotName),
+        if (_currentSession.countryOrRegion.isNotEmpty)
+          _buildInfoItem("🌎", t("Region", "Región"), _currentSession.countryOrRegion),
+        if (_currentSession.waveSize.isNotEmpty)
+          _buildInfoItem("🌊", t("Waves", "Olas"), SurfConstants.getWaveHeightTranslation(_currentSession.waveSize, widget.isSpanish)),
+        if (_currentSession.board.isNotEmpty)
+          _buildInfoItem("🏄", t("Board", "Tabla"), SurfConstants.getBoardTranslation(_currentSession.board, widget.isSpanish)),
+        if (_currentSession.waveSize != null && _currentSession.waveSize!.isNotEmpty)
+          _buildInfoItem("🌊", t("Conditions", "Condiciones"), 
+            "${SurfConstants.getWaveHeightTranslation(_currentSession.waveSize, widget.isSpanish)} · ${SurfConstants.getConditionTranslation(_currentSession.reflectionConditions, widget.isSpanish)}"),
+        if (_currentSession.durationMins > 0)
+          _buildInfoItem("⏱", t("Duration", "Duración"), "${_currentSession.durationMins}m"),
+        if (_currentSession.rating > 0)
+          _buildInfoItem("⭐", t("Rating", "Valoración"), "${_currentSession.rating}/5"),
+        if (_currentSession.waveLocation != null && _currentSession.waveLocation!.isNotEmpty)
+          _buildInfoItem("🌊", t("Wave Context", "Contexto de Ola"), 
+            SurfConstants.getWaveLocationTranslation(_currentSession.waveLocation, widget.isSpanish)),
       ],
     );
   }
@@ -2065,28 +2260,20 @@ class _SessionDetailSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildField(String label, String content, {bool isItalic = false, Color? color}) {
+  Widget _buildField(String label, String value, {bool isItalic = false, Color? color}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.textMuted, letterSpacing: 0.5)),
+        Text(label.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppTheme.textMuted, letterSpacing: 1.1)),
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceVariant.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.surfaceVariant),
-          ),
-          width: double.infinity,
-          child: Text(
-            content,
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.5,
-              fontStyle: isItalic ? FontStyle.italic : null,
-              color: color,
-            ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 15,
+            height: 1.6,
+            fontWeight: isItalic ? FontWeight.w500 : FontWeight.w400,
+            fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
+            color: color,
           ),
         ),
       ],
@@ -2138,68 +2325,7 @@ class _SurfInsightTriggerCard extends StatefulWidget {
   @override
   State<_SurfInsightTriggerCard> createState() => _SurfInsightTriggerCardState();
 }
-
 class _SurfInsightTriggerCardState extends State<_SurfInsightTriggerCard> {
-  bool _isGenerating = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.isSurferPro && (widget.session.aiSummaryEn == null || widget.session.aiSummaryEn!.isEmpty)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _generateInsight());
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant _SurfInsightTriggerCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isSurferPro && !oldWidget.isSurferPro && (widget.session.aiSummaryEn == null || widget.session.aiSummaryEn!.isEmpty)) {
-      _generateInsight();
-    }
-  }
-
-  void _generateInsight() async {
-    if (_isGenerating) return;
-    if (!widget.isSurferPro) {
-      showSurfInsightPaywall(
-        context, 
-        isSpanish: widget.isSpanish,
-        onUnlock: widget.onUnlockSurferPro,
-      );
-      return;
-    }
-
-    setState(() => _isGenerating = true);
-    
-    // Simulate AI generation delay
-    await Future.delayed(const Duration(seconds: 2));
-
-    // Use AiInsightService to generate both English and Spanish insights
-    final results = AiInsightService.generate(
-      session: widget.session,
-      isSpanish: widget.isSpanish,
-      previousLogs: widget.logs,
-    );
-
-    final updatedSession = widget.session.copyWith(
-      aiSummary: results['summaryEn'], // Legacy fallback
-      aiProgressPattern: results['patternEn'], // Legacy fallback
-      aiNextFocus: results['nextFocusEn'], // Legacy fallback
-      aiSummaryEn: results['summaryEn'],
-      aiSummaryEs: results['summaryEs'],
-      aiProgressPatternEn: results['patternEn'],
-      aiProgressPatternEs: results['patternEs'],
-      aiNextFocusEn: results['nextFocusEn'],
-      aiNextFocusEs: results['nextFocusEs'],
-    );
-
-    widget.onAdd(updatedSession);
-    
-    if (mounted) {
-      setState(() => _isGenerating = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = widget.isSpanish;
@@ -2209,10 +2335,10 @@ class _SurfInsightTriggerCardState extends State<_SurfInsightTriggerCard> {
     final String? pattern = t ? widget.session.aiProgressPatternEs : widget.session.aiProgressPatternEn;
     final String? nextFocus = t ? widget.session.aiNextFocusEs : widget.session.aiNextFocusEn;
 
-    final bool hasInsight = summary != null && pattern != null;
+    final bool hasInsight = summary != null && summary.isNotEmpty;
 
     if (!hasInsight) {
-      // Button State
+      // Intentional Moment: Dashboard Trigger
       return AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2237,22 +2363,29 @@ class _SurfInsightTriggerCardState extends State<_SurfInsightTriggerCard> {
               width: double.infinity,
               height: 48,
               child: FilledButton(
-                onPressed: _isGenerating ? null : _generateInsight,
+                onPressed: () => _SessionDetailSheet.show(
+                  context, 
+                  session: widget.session, 
+                  isSpanish: widget.isSpanish, 
+                  units: "imperial", // Units managed inside the sheet details
+                  isSurferPro: widget.isSurferPro,
+                  onAdd: widget.onAdd,
+                  logs: widget.logs,
+                  autoGenerate: true,
+                ),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: _isGenerating 
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text(t ? "Generar Insight" : "Generate Surf Insight", style: const TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(t ? "Generar Insight ✨" : "Generate Surf Insight ✨", style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(height: 20),
             Center(
               child: Text(
                 t 
-                  ? "Los insights de IA se generan a partir de tus datos y reflexiones. Están destinados a apoyar tu aprendizaje y no reemplazan los comentarios de un coach de surf real."
-                  : "AI insights are generated from your session data and reflections. They are meant to support your learning and do not replace feedback from a real surf coach.",
+                  ? "Los insights de IA se generan a partir de tus datos y reflexiones. Están destinados a apoyar tu aprendizaje."
+                  : "AI insights are generated from your session data and reflections to support your learning.",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 10, 

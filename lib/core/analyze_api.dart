@@ -5,9 +5,7 @@ import 'package:flutter/foundation.dart';
 
 class AnalyzeApi {
   // Uses live API in production (TestFlight/App Store), and localhost for active development
-  static const String _baseUrl = kReleaseMode 
-      ? 'https://api.smartsurf.app'
-      : 'http://localhost:8000';
+  static const String _baseUrl = 'https://smart-surf-backend.onrender.com';
 
   static Future<Map<String, dynamic>> uploadAndAnalyze(
     XFile videoFile, {
@@ -67,10 +65,12 @@ class AnalyzeApi {
     required String feltGood,
     required String conditions,
     required String notes,
+    required String language,
   }) async {
     final uri = Uri.parse('$_baseUrl/api/analyze_reflection');
     
     try {
+      debugPrint("AnalyzeApi: CALLING REAL AI BACKEND for reflection...");
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
@@ -81,15 +81,19 @@ class AnalyzeApi {
           'felt_good': feltGood,
           'conditions': conditions,
           'notes': notes,
+          'language': language,
         }),
-      ).timeout(const Duration(seconds: 15)); // Fast timeout since we have a robust UI fallback
+      ).timeout(const Duration(seconds: 30)); 
 
       if (response.statusCode == 200) {
+        debugPrint("AnalyzeApi: REAL BACKEND SUCCESS ✔");
         return jsonDecode(response.body);
       } else {
+        debugPrint("AnalyzeApi: BACKEND ERROR ${response.statusCode} ✖");
         throw Exception('Failed with status: ${response.statusCode}');
       }
     } catch (e) {
+      debugPrint("AnalyzeApi: REQUEST FAILED: $e");
       throw Exception('Reflection request failed: $e');
     }
   }

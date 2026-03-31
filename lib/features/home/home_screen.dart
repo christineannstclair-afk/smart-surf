@@ -34,6 +34,7 @@ class HomeScreen extends StatefulWidget {
   final bool isSpanish;
   final bool isCoachPro;
   final bool isSurferPro;
+  final bool isSurferTrial;
   final void Function(bool) onSetLanguage;
 
   // Canonical EN values
@@ -121,6 +122,7 @@ class HomeScreen extends StatefulWidget {
     required this.isSpanish,
     required this.isCoachPro,
     required this.isSurferPro,
+    this.isSurferTrial = false,
     required this.onSetLanguage,
     required this.levelEnTitle,
     required this.levelEnDesc,
@@ -530,7 +532,9 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 12),
               Text(
                 isPro
-                    ? _t('Surfer Pro Active', 'Surfer Pro Activo')
+                    ? (widget.isSurferTrial 
+                        ? _t('Trial active', 'Prueba activa')
+                        : _t('Surfer Pro active', 'Surfer Pro activo'))
                     : _t('Surfer Pro', 'Surfer Pro'),
                 style: const TextStyle(
                   fontWeight: FontWeight.w900,

@@ -25,6 +25,7 @@ class SurfDashboardData {
   final bool ageVisibleOnDashboard;
   final String? latestMediaPath;
   final String? latestMediaType;
+  final String? email;
 
   const SurfDashboardData({
     required this.levelTitle,
@@ -52,6 +53,7 @@ class SurfDashboardData {
     required this.ageVisibleOnDashboard,
     this.latestMediaPath,
     this.latestMediaType,
+    this.email,
   });
 
   Map<String, dynamic> toJson() => {
@@ -80,6 +82,7 @@ class SurfDashboardData {
         'ageVisibleOnDashboard': ageVisibleOnDashboard,
         'latestMediaPath': latestMediaPath,
         'latestMediaType': latestMediaType,
+        'email': email,
       };
 
   static SurfDashboardData fromJson(Map<String, dynamic> json) {
@@ -114,6 +117,7 @@ class SurfDashboardData {
       ageVisibleOnDashboard: json['ageVisibleOnDashboard'] as bool? ?? true,
       latestMediaPath: json['latestMediaPath'] as String?,
       latestMediaType: json['latestMediaType'] as String?,
+      email: json['email'] as String?,
     );
   }
 
@@ -143,6 +147,7 @@ class SurfDashboardData {
     bool? ageVisibleOnDashboard,
     String? latestMediaPath,
     String? latestMediaType,
+    String? email,
   }) {
     return SurfDashboardData(
       levelTitle: levelTitle ?? this.levelTitle,
@@ -170,6 +175,7 @@ class SurfDashboardData {
       ageVisibleOnDashboard: ageVisibleOnDashboard ?? this.ageVisibleOnDashboard,
       latestMediaPath: latestMediaPath ?? this.latestMediaPath,
       latestMediaType: latestMediaType ?? this.latestMediaType,
+      email: email ?? this.email,
     );
   }
 }

@@ -20,6 +20,7 @@ class CoachDashboardScreen extends StatefulWidget {
   final SurfDashboardData? surferData;
   final int sessionsSurfed;
   final DateTime? lastSurfedDate;
+  final VoidCallback? onReturnToDashboard;
 
   const CoachDashboardScreen({
     super.key,
@@ -28,6 +29,7 @@ class CoachDashboardScreen extends StatefulWidget {
     this.surferData,
     this.sessionsSurfed = 0,
     this.lastSurfedDate,
+    this.onReturnToDashboard,
   });
 
   @override
@@ -225,7 +227,7 @@ class _CoachDashboardScreenState extends State<CoachDashboardScreen> {
       appBar: AppBar(
         titleSpacing: 16,
         centerTitle: false,
-        title: const SmartSurfWordmark(),
+        title: SmartSurfWordmark(onTap: widget.onReturnToDashboard),
       ),
       body: !widget.isCoachPro ? _buildGatedView(context) : _buildDashboard(context),
     );

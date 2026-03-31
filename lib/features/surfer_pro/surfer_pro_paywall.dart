@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../session_log/firebase_service.dart';
 import 'dart:ui' as ui;
 import '../../ui_system/app_theme.dart';
 import '../../ui_system/spacing.dart';
@@ -122,6 +123,7 @@ class SurfInsightPaywall extends StatelessWidget {
             height: 56,
             child: FilledButton(
               onPressed: () {
+                FirebaseService().logEvent('upgrade_clicked');
                 if (onUnlock != null) {
                   onUnlock!();
                 }
@@ -132,12 +134,23 @@ class SurfInsightPaywall extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
               child: Text(
-                _t("Start Free Trial", "Comenzar prueba gratis"),
+                _t("Start 3-Day Free Trial", "Comenzar prueba gratis de 3 días"),
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          Text(
+            _t("3-day free trial, then ${SubscriptionConfig.surferMonthlyStr}/month. Cancel anytime.\nYour subscription automatically renews unless canceled at least 24 hours before the end of the trial.", 
+               "Prueba de 3 días, luego ${SubscriptionConfig.surferMonthlyStr}/mes. Cancela cuando quieras.\nTu suscripción se renueva automáticamente a menos que se cancele 24 horas antes."),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 8),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(

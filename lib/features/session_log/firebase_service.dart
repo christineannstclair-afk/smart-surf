@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 import '../../storage/app_storage.dart';
 import '../../models/surf_dashboard_data.dart';
@@ -46,39 +47,42 @@ class FirebaseService {
   String? _initError;
   Completer<void>? _initCompleter;
   
+  static final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+  static final FirebaseAnalyticsObserver observer = FirebaseAnalyticsObserver(analytics: analytics);
+
   String? get currentUid => FirebaseAuth.instance.currentUser?.uid;
 
   /// Call this inside main() to guarantee Firebase is ready and the user has a stable UID.
+  Future<void> initialize() async {
+    if (_initialized) return;
+    if (_initCompleter != null) return _initCompleter!.future;
 
-Future<void> initialize() async {
-if (_initialized) return;
-if (_initCompleter != null) return _initCompleter!.future;
+    _initCompleter = Completer<void>();
 
-_initCompleter = Completer<void>();
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      }
 
-try {
-if (Firebase.apps.isEmpty) {
-await Firebase.initializeApp(
-options: DefaultFirebaseOptions.currentPlatform,
-);
-}
+      _initialized = true;
+      await analytics.logEvent(name: 'app_initialized');
+      _initCompleter!.complete();
+    } catch (e) {
+      final errorText = e.toString();
 
-_initialized = true;
-_initCompleter!.complete();
-} catch (e) {
-final errorText = e.toString();
+      if (errorText.contains('duplicate-app') ||
+          errorText.contains('already exists')) {
+        _initialized = true;
+        _initCompleter!.complete();
+        return;
+      }
 
-if (errorText.contains('duplicate-app') ||
-errorText.contains('already exists')) {
-_initialized = true;
-_initCompleter!.complete();
-return;
-}
-
-_initCompleter!.completeError(e);
-rethrow;
-}
-}
+      _initCompleter!.completeError(e);
+      rethrow;
+    }
+  }
 
   /// Ensures Firebase is ready before any operation
   Future<void> _ensureReady() async {
@@ -90,93 +94,93 @@ rethrow;
   /// Uploads media bytes to Firebase Storage and returns the permanent HTTPS Download URL 
   /// alongside the precise Storage Path for future modifications.
   Future<FirebaseUploadResult?> uploadMedia({
-required String localPath,
-required bool isProfile,
-required bool isVideo,
-String? sessionId,
-Uint8List? webBytes,
-}) async {
-await _ensureReady();
+    required String localPath,
+    required bool isProfile,
+    required bool isVideo,
+    String? sessionId,
+    Uint8List? webBytes,
+  }) async {
+    await _ensureReady();
 
-final uid = currentUid;
-if (uid == null) {
-return FirebaseUploadResult.error(
-'auth-failed',
-'No authenticated user (UID is null).',
-);
-}
+    final uid = currentUid;
+    if (uid == null) {
+      return FirebaseUploadResult.error(
+        'auth-failed',
+        'No authenticated user (UID is null).',
+      );
+    }
 
-if (!isProfile && (sessionId == null || sessionId.isEmpty)) {
-return FirebaseUploadResult.error(
-'missing-session-id',
-'Session media upload requires a real sessionId.',
-);
-}
+    if (!isProfile && (sessionId == null || sessionId.isEmpty)) {
+      return FirebaseUploadResult.error(
+        'missing-session-id',
+        'Session media upload requires a real sessionId.',
+      );
+    }
 
-try {
-final timestamp = DateTime.now().millisecondsSinceEpoch;
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-final String extension = isVideo ? 'mp4' : 'jpg';
-final String storageLocation = isProfile
-? 'users/$uid/profile/profile.$extension'
-: 'users/$uid/sessions/$sessionId/${timestamp}_media.$extension';
+      final String extension = isVideo ? 'mp4' : 'jpg';
+      final String storageLocation = isProfile
+          ? 'users/$uid/profile/profile.$extension'
+          : 'users/$uid/sessions/$sessionId/${timestamp}_media.$extension';
 
-debugPrint('DEBUG STORAGE UPLOAD');
-debugPrint('- uid: $uid');
-debugPrint('- storagePath: $storageLocation');
-debugPrint('- isProfile: $isProfile');
-debugPrint('- isVideo: $isVideo');
-debugPrint('- localPath: $localPath');
+      debugPrint('DEBUG STORAGE UPLOAD');
+      debugPrint('- uid: $uid');
+      debugPrint('- storagePath: $storageLocation');
+      debugPrint('- isProfile: $isProfile');
+      debugPrint('- isVideo: $isVideo');
+      debugPrint('- localPath: $localPath');
 
-final ref = FirebaseStorage.instance.ref().child(storageLocation);
+      final ref = FirebaseStorage.instance.ref().child(storageLocation);
 
-final metadata = SettableMetadata(
-contentType: isVideo ? 'video/mp4' : 'image/jpeg',
-customMetadata: {
-'uid': uid,
-'sessionId': sessionId ?? '',
-'source': kIsWeb ? 'web_debug_upload' : 'mobile_debug_upload',
-},
-);
+      final metadata = SettableMetadata(
+        contentType: isVideo ? 'video/mp4' : 'image/jpeg',
+        customMetadata: {
+          'uid': uid,
+          'sessionId': sessionId ?? '',
+          'source': kIsWeb ? 'web_debug_upload' : 'mobile_debug_upload',
+        },
+      );
 
-late final TaskSnapshot snapshot;
+      late final TaskSnapshot snapshot;
 
-if (kIsWeb && webBytes != null) {
-snapshot = await ref.putData(webBytes, metadata);
-} else {
-final file = File(localPath);
-final exists = await file.exists();
-if (!exists) {
-return FirebaseUploadResult.error(
-'file-not-found',
-'Local file not found: $localPath',
-);
-}
+      if (kIsWeb && webBytes != null) {
+        snapshot = await ref.putData(webBytes, metadata);
+      } else {
+        final file = File(localPath);
+        final exists = await file.exists();
+        if (!exists) {
+          return FirebaseUploadResult.error(
+            'file-not-found',
+            'Local file not found: $localPath',
+          );
+        }
 
-snapshot = await ref.putFile(file, metadata);
-}
+        snapshot = await ref.putFile(file, metadata);
+      }
 
-debugPrint('Firebase upload complete');
-debugPrint('- fullPath: ${snapshot.ref.fullPath}');
-debugPrint('- bucket: ${snapshot.ref.bucket}');
-debugPrint('- bytesTransferred: ${snapshot.bytesTransferred}');
+      debugPrint('Firebase upload complete');
+      debugPrint('- fullPath: ${snapshot.ref.fullPath}');
+      debugPrint('- bucket: ${snapshot.ref.bucket}');
+      debugPrint('- bytesTransferred: ${snapshot.bytesTransferred}');
 
-final downloadUrl = await snapshot.ref.getDownloadURL();
+      final downloadUrl = await snapshot.ref.getDownloadURL();
 
-debugPrint('Firebase download URL: $downloadUrl');
+      debugPrint('Firebase download URL: $downloadUrl');
 
-return FirebaseUploadResult.success(downloadUrl, snapshot.ref.fullPath);
-} on FirebaseException catch (e) {
-debugPrint('Firebase ERROR [${e.code}]: ${e.message}');
-return FirebaseUploadResult.error(
-e.code,
-e.message ?? 'Unknown Firebase error',
-);
-} catch (e) {
-debugPrint('Failed to upload media to Firebase: $e');
-return FirebaseUploadResult.error('unknown', e.toString());
-}
-}
+      return FirebaseUploadResult.success(downloadUrl, snapshot.ref.fullPath);
+    } on FirebaseException catch (e) {
+      debugPrint('Firebase ERROR [${e.code}]: ${e.message}');
+      return FirebaseUploadResult.error(
+        e.code,
+        e.message ?? 'Unknown Firebase error',
+      );
+    } catch (e) {
+      debugPrint('Failed to upload media to Firebase: $e');
+      return FirebaseUploadResult.error('unknown', e.toString());
+    }
+  }
 
   static bool isStableUrl(String? url) {
     if (url == null || url.isEmpty) return false;
@@ -197,10 +201,6 @@ return FirebaseUploadResult.error('unknown', e.toString());
       
       Map<String, dynamic> firestoreData = data.toJson();
       firestoreData['updatedAt'] = FieldValue.serverTimestamp();
-      
-      // Rename profilePhotoPath to profilePhotoUrl for Firestore consistency if needed, 
-      // but let's stick to the json mapping or keep it explicit.
-      // Current model uses 'profilePhotoPath' in toJson.
       
       await FirebaseFirestore.instance.collection('users').doc(currentUid).set(
         firestoreData, 
@@ -315,8 +315,13 @@ return FirebaseUploadResult.error('unknown', e.toString());
             latestMediaType: data['latestMediaType'] as String? ?? hydratedProgress.latestMediaType,
             ageVisibleToCoach: data['ageVisibleToCoach'] as bool? ?? hydratedProgress.ageVisibleToCoach,
             ageVisibleOnDashboard: data['ageVisibleOnDashboard'] as bool? ?? hydratedProgress.ageVisibleOnDashboard,
+            email: data['email'] as String? ?? hydratedProgress.email,
           );
         }
+      } else {
+        debugPrint("Firebase: No Firestore record for $currentUid. Keeping local state as is.");
+        // If this is a brand new anonymous user, main.dart will call _clearProfileState() 
+        // during the "Skip for now" onboarding flow to clear any stale disk cache.
       }
       
       // 2. Hydrate Session Entries
@@ -365,5 +370,16 @@ return FirebaseUploadResult.error('unknown', e.toString());
       reflections: localData.reflections,
       aiAnalyses: localData.aiAnalyses,
     );
+  }
+
+  /// Centralized logic to log MVP analytics events
+  Future<void> logEvent(String name, {Map<String, dynamic>? parameters}) async {
+    await _ensureReady();
+    try {
+      await analytics.logEvent(name: name, parameters: parameters?.cast<String, Object>());
+      debugPrint("Analytics: Logged event '$name' with params: $parameters");
+    } catch (e) {
+      debugPrint("Analytics ERROR: Failed to log event '$name': $e");
+    }
   }
 }

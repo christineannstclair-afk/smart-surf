@@ -1,4 +1,5 @@
 import 'session_log_entry.dart';
+import '../../ui_system/surf_constants.dart';
 
 /// Generates AI Surf Insights from session data.
 ///
@@ -402,8 +403,9 @@ class AiInsightService {
     final top = counts.entries.where((e) => e.value >= 2).toList()..sort((a,b) => b.value.compareTo(a.value));
     if (top.isNotEmpty) {
       final f = top.first.key;
+      final translatedF = SurfConstants.getFocusSkillTranslation(f, isSpanish);
       return isSpanish 
-        ? "Identificar detalles como '$f' puede ayudarte a entender mejor tus sesiones con el tiempo." 
+        ? "Identificar detalles como '$translatedF' puede ayudarte a entender mejor tus sesiones con el tiempo." 
         : "Noticing details like '$f' can help you understand your sessions better over time.";
     }
     return null;

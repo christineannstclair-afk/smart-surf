@@ -18,7 +18,6 @@ import 'features/map/map_models.dart';
 import 'features/map/map_screen.dart';
 
 import 'features/Settings/settings_models.dart';
-import 'features/coach_pro/coach_dashboard_screen.dart';
 import 'features/Settings/settings_screen.dart';
 import 'widgets/orientation_prompt.dart';
 import 'widgets/success_banner.dart';
@@ -61,7 +60,7 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
   OverlayEntry? _tourOverlay;
 
   final SubscriptionService _subService = SubscriptionService();
-  AppSettings _settings = const AppSettings(isSpanish: false, isCoachPro: false, isSurferPro: false);
+  AppSettings _settings = const AppSettings(isSpanish: false, isCoachPro: false, isSurferPro: false, isSurferTrial: false);
 
   final List<SessionReflection> _reflections = [];
   final List<AiAnalysisResult> _aiAnalyses = [];
@@ -78,12 +77,11 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
     _updateSettings(_settings.copyWith(isSpanish: spanish));
   }
 
-  void _setHasEnteredApp(bool entered) {
-    _updateSettings(_settings.copyWith(hasEnteredApp: entered, appVersion: '1.0.1'));
-  }
+
 
   void _resetOnboarding() {
     setState(() => _quickStartShown = false);
+    AppStorage.clearTourFlags();
     _updateSettings(_settings.copyWith(
       hasEnteredApp: false, 
       hasSeenOnboarding: false, 
@@ -91,6 +89,8 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       seenDashboardPrompt: false,
       seenLogPrompt: false,
       seenPassportPrompt: false,
+      hasSeenMapTip: false,
+      hasSeenSettingsTip: false,
       appVersion: '1.0.1'
     ));
     if (mounted && context.mounted) {
@@ -105,8 +105,8 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
 
   void _unlockSurferPro() {
     _updateSettings(_settings.copyWith(isSurferPro: true));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    if (_navigatorKey.currentContext != null) {
+      ScaffoldMessenger.of(_navigatorKey.currentContext!).showSnackBar(
         SnackBar(
           content: Text(_isSpanish ? '¡Surfer Pro desbloqueado!' : 'Surfer Pro Unlocked!'),
           backgroundColor: AppTheme.primary,
@@ -280,8 +280,41 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       surferSummary: _surferSummary,
       ageVisibleToCoach: _ageVisibleToCoach,
       ageVisibleOnDashboard: _ageVisibleOnDashboard,
+      email: FirebaseAuth.instance.currentUser?.email,
+    ));
+    
+    // Objective 4.2: Aggressively sync to Firestore
+    FirebaseService().saveFullProfile(SurfDashboardData(
+      levelTitle: _levelEnTitle,
+      levelDesc: _levelEnDesc,
+      comfortZone: _comfortEn,
+      board: _boardEn,
+      focusSkills: _focusEn,
+      stance: _stance,
+      height: _height,
+      weight: _weight,
+      location: _location,
+      displayName: _displayName,
+      profilePhotoPath: _profilePhotoPath,
+      stanceVisibleToCoach: _stanceVisibleToCoach,
+      stanceVisibleOnDashboard: _stanceVisibleOnDashboard,
+      heightVisibleToCoach: _heightVisibleToCoach,
+      heightVisibleOnDashboard: _heightVisibleOnDashboard,
+      weightVisibleToCoach: _weightVisibleToCoach,
+      weightVisibleOnDashboard: _weightVisibleOnDashboard,
+      locationVisibleToCoach: _locationVisibleToCoach,
+      locationVisibleOnDashboard: _locationVisibleOnDashboard,
+      latestMediaPath: _latestMediaPath,
+      latestMediaType: _latestMediaType,
+      age: _age,
+      surferSummary: _surferSummary,
+      ageVisibleToCoach: _ageVisibleToCoach,
+      ageVisibleOnDashboard: _ageVisibleOnDashboard,
+      email: FirebaseAuth.instance.currentUser?.email,
     ));
   }
+
+
 
 
   void _addSession(SessionLogEntry entry, {bool showBanner = false}) {
@@ -321,7 +354,6 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       }
     });
     AppStorage.saveSessions(_sessionLogs);
-    // Persist the updated focus skills in profile as well
     AppStorage.saveProgress(SurfDashboardData(
       levelTitle: _levelEnTitle,
       levelDesc: _levelEnDesc,
@@ -348,6 +380,37 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       surferSummary: _surferSummary,
       ageVisibleToCoach: _ageVisibleToCoach,
       ageVisibleOnDashboard: _ageVisibleOnDashboard,
+      email: FirebaseAuth.instance.currentUser?.email,
+    ));
+    
+    // Sync to Firestore
+    FirebaseService().saveFullProfile(SurfDashboardData(
+      levelTitle: _levelEnTitle,
+      levelDesc: _levelEnDesc,
+      comfortZone: _comfortEn,
+      board: _boardEn,
+      focusSkills: _focusEn,
+      stance: _stance,
+      height: _height,
+      weight: _weight,
+      location: _location,
+      displayName: _displayName,
+      profilePhotoPath: _profilePhotoPath,
+      stanceVisibleToCoach: _stanceVisibleToCoach,
+      stanceVisibleOnDashboard: _stanceVisibleOnDashboard,
+      heightVisibleToCoach: _heightVisibleToCoach,
+      heightVisibleOnDashboard: _heightVisibleOnDashboard,
+      weightVisibleToCoach: _weightVisibleToCoach,
+      weightVisibleOnDashboard: _weightVisibleOnDashboard,
+      locationVisibleToCoach: _locationVisibleToCoach,
+      locationVisibleOnDashboard: _locationVisibleOnDashboard,
+      latestMediaPath: _latestMediaPath,
+      latestMediaType: _latestMediaType,
+      age: _age,
+      surferSummary: _surferSummary,
+      ageVisibleToCoach: _ageVisibleToCoach,
+      ageVisibleOnDashboard: _ageVisibleOnDashboard,
+      email: FirebaseAuth.instance.currentUser?.email,
     ));
 
     if (showBanner && _navigatorKey.currentState != null) {
@@ -427,18 +490,36 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
     AppStorage.saveSessions(_sessionLogs);
   }
 
-  Future<void> _resetSessions() async {
+  Future<void> _performFullReset() async {
+    // 1. Clear all local state
     setState(() {
       _sessionLogs.clear();
       _aiAnalyses.clear();
       _reflections.clear();
       _spots.clear();
+      _focusEn = [];
+      _levelEnTitle = "";
+      _levelEnDesc = "";
+      _comfortEn = "";
+      _boardEn = "";
+      _displayName = "";
+      _profilePhotoPath = null;
+      _index = 0;
+      _showOnboarding = true;
+      _enteredThisSession = false;
+      _quickStartShown = false;
     });
 
+    // 2. Clear persistent storage
+    await AppStorage.clearAll();
+    
+    // 3. Clear cloud state if authenticated
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
       try {
         final batch = FirebaseFirestore.instance.batch();
+        
+        // Delete sessions collection
         final sessions = await FirebaseFirestore.instance
             .collection('users')
             .doc(uid)
@@ -447,46 +528,29 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         for (var doc in sessions.docs) {
           batch.delete(doc.reference);
         }
+        
+        // Delete user document
+        batch.delete(FirebaseFirestore.instance.collection('users').doc(uid));
+        
         await batch.commit();
-        debugPrint("Firebase: Reset sessions SUCCESS for $uid");
+        await FirebaseAuth.instance.signOut();
+        debugPrint("Cloud Reset: SUCCESS for $uid");
       } catch (e) {
-        debugPrint("Firebase ERROR resetting sessions: $e");
+        debugPrint("Cloud Reset: ERROR: $e");
       }
     }
-
-    await _resetAppState();
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isSpanish ? 'Sesiones reiniciadas' : 'Sessions reset'),
+          content: Text(_isSpanish ? 'Datos restablecidos por completo' : 'App data fully reset'),
           behavior: SnackBarBehavior.floating,
         ),
       );
     }
   }
 
-Future<void> _resetAppState() async {
-  try {
-    if (FirebaseAuth.instance.currentUser != null) {
-      await FirebaseAuth.instance.signOut();
-    }
-  } catch (e) {
-    debugPrint("Auth sign out error during reset: $e");
-  }
-
-  if (!mounted) return;
-
-  setState(() {
-    _showSplash = false;
-    _showOnboarding = true;
-    _enteredThisSession = false;
-    _quickStartShown = false;
-    _index = 0;
-  });
-}
-
-// Spots
+  // Spots
   List<SurfSpot> _spots = [];
   void _setSpots(List<SurfSpot> spots) {
     setState(() => _spots = spots);
@@ -502,6 +566,7 @@ Future<void> _resetAppState() async {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   void _showSurferPro() {
+    FirebaseService().logEvent('surfer_pro_opened');
     if (_navigatorKey.currentContext != null) {
       if (_settings.isSurferPro) {
         showSurferProModal(
@@ -523,44 +588,9 @@ Future<void> _resetAppState() async {
     }
   }
 
-  void _showCoachDashboard() {
-    _navigatorKey.currentState?.push(
-      MaterialPageRoute(
-        builder: (ctx) => CoachDashboardScreen(
-          isSpanish: _isSpanish,
-          isCoachPro: _settings.isCoachPro,
-          surferData: SurfDashboardData(
-            levelTitle: _levelEnTitle,
-            levelDesc: _levelEnDesc,
-            comfortZone: _comfortEn,
-            board: _boardEn,
-            focusSkills: _focusEn,
-            stance: _stance,
-            height: _height,
-            weight: _weight,
-            location: _location,
-            displayName: _displayName,
-            profilePhotoPath: _profilePhotoPath,
-            stanceVisibleToCoach: _stanceVisibleToCoach,
-            stanceVisibleOnDashboard: _stanceVisibleOnDashboard,
-            heightVisibleToCoach: _heightVisibleToCoach,
-            heightVisibleOnDashboard: _heightVisibleOnDashboard,
-            weightVisibleToCoach: _weightVisibleToCoach,
-            weightVisibleOnDashboard: _weightVisibleOnDashboard,
-            locationVisibleToCoach: _locationVisibleToCoach,
-            locationVisibleOnDashboard: _locationVisibleOnDashboard,
-            latestMediaPath: _latestMediaPath,
-            latestMediaType: _latestMediaType,
-            age: _age,
-            surferSummary: _surferSummary,
-            ageVisibleToCoach: _ageVisibleToCoach,
-            ageVisibleOnDashboard: _ageVisibleOnDashboard,
-          ),
-          sessionsSurfed: _sessionsSurfed,
-          lastSurfedDate: _lastSurfedDate,
-        ),
-      ),
-    );
+  void _onReturnToDashboard() {
+    setState(() => _index = 0);
+    _navigatorKey.currentState?.popUntil((route) => route.isFirst);
   }
 
   @override
@@ -574,6 +604,7 @@ Future<void> _resetAppState() async {
     await _subService.init();
     final isCoachPro = await _subService.isCoachProActive();
     final isSurferPro = await _subService.isSurferProActive();
+    final isSurferTrial = await _subService.isSurferTrialActive();
 
     // 1. Initialize Firebase & Auth centrally
 
@@ -586,8 +617,10 @@ Future<void> _resetAppState() async {
       _settings = data.settings.copyWith(
         isCoachPro: isCoachPro,
         isSurferPro: isSurferPro,
+        isSurferTrial: isSurferTrial,
       );
-      _showOnboarding = !_settings.hasSeenOnboarding;
+      final user = FirebaseAuth.instance.currentUser;
+      _showOnboarding = user == null || !_settings.hasSeenOnboarding;
       _isBooting = false;
       
       // If we skip onboarding because hasSeenOnboarding is true, we mark this session as "entered" 
@@ -636,7 +669,7 @@ Future<void> _resetAppState() async {
 
   Future<void> _showQuickStart(BuildContext context) async {
     if (_quickStartShown) return;
-    if (!_enteredThisSession && !_settings.showQuickStartOnLaunch) return;
+    if (!_settings.showQuickStartOnLaunch) return;
 
     _quickStartShown = true;
 
@@ -719,11 +752,12 @@ Future<void> _resetAppState() async {
         isSpanish: _isSpanish,
         onSetLanguage: _setLanguage,
         onFinish: (name, profilePhotoPath, comfortZone, boardType) {
-          // Update profile data if provided
+          // Update profile data
           if (name != null) _displayName = name;
           if (profilePhotoPath != null) _profilePhotoPath = profilePhotoPath;
           if (comfortZone != null) _comfortEn = comfortZone;
           if (boardType != null) _boardEn = boardType;
+
 
           // Save profile progress
           AppStorage.saveProgress(SurfDashboardData(
@@ -765,6 +799,38 @@ Future<void> _resetAppState() async {
             _enteredThisSession = true;
             _index = 0;
           });
+
+          // Aggressively sync the profile to Firestore now that we are logged in
+          final progressData = SurfDashboardData(
+            levelTitle: _levelEnTitle,
+            levelDesc: _levelEnDesc,
+            comfortZone: _comfortEn,
+            board: _boardEn,
+            focusSkills: _focusEn,
+            stance: _stance,
+            height: _height,
+            weight: _weight,
+            location: _location,
+            displayName: _displayName,
+            profilePhotoPath: _profilePhotoPath,
+            stanceVisibleToCoach: _stanceVisibleToCoach,
+            stanceVisibleOnDashboard: _stanceVisibleOnDashboard,
+            heightVisibleToCoach: _heightVisibleToCoach,
+            heightVisibleOnDashboard: _heightVisibleOnDashboard,
+            weightVisibleToCoach: _weightVisibleToCoach,
+            weightVisibleOnDashboard: _weightVisibleOnDashboard,
+            locationVisibleToCoach: _locationVisibleToCoach,
+            locationVisibleOnDashboard: _locationVisibleOnDashboard,
+            latestMediaPath: _latestMediaPath,
+            latestMediaType: _latestMediaType,
+            age: _age,
+            surferSummary: _surferSummary,
+            ageVisibleToCoach: _ageVisibleToCoach,
+            ageVisibleOnDashboard: _ageVisibleOnDashboard,
+            email: FirebaseAuth.instance.currentUser?.email,
+          );
+          
+          FirebaseService().saveFullProfile(progressData);
         },
       );
     }
@@ -777,6 +843,7 @@ Future<void> _resetAppState() async {
         isSpanish: _isSpanish,
         isCoachPro: _settings.isCoachPro,
         isSurferPro: _settings.isSurferPro,
+        isSurferTrial: _settings.isSurferTrial,
         onSetLanguage: _setLanguage,
         onUnlockSurferPro: _unlockSurferPro,
         levelEnTitle: _levelEnTitle,
@@ -855,6 +922,7 @@ Future<void> _resetAppState() async {
         onPromptDismissed: () => _updateSettings(_settings.copyWith(seenPassportPrompt: true)),
         seenPassportPrompt: _settings.seenPassportPrompt,
         logs: _sessionLogs,
+        onReturnToDashboard: _onReturnToDashboard,
       ),
 
 // 2 = Session Logs
@@ -875,6 +943,7 @@ Future<void> _resetAppState() async {
         onUnlockSurferPro: _unlockSurferPro,
         sessionsThisMonth: _sessionsThisMonth,
         currentStreak: _currentStreak,
+        onReturnToDashboard: _onReturnToDashboard,
       ),
 
 // 3 = Map
@@ -884,6 +953,7 @@ Future<void> _resetAppState() async {
         spots: _spots,
         onSpotsChanged: _setSpots,
         mapKey: _mapKey,
+        onReturnToDashboard: _onReturnToDashboard,
       ),
 
 // 4 = Settings
@@ -892,14 +962,16 @@ Future<void> _resetAppState() async {
         onChanged: _updateSettings,
         onResetQuickstart: _resetOnboarding,
         onOpenSurferPro: _showSurferPro,
-        onOpenCoachDashboard: _showCoachDashboard,
-        onResetSessions: _resetSessions,
-        onResetAppState: _resetAppState,
+        onResetSessions: _performFullReset,
+        onResetAppState: _performFullReset,
         onRunTour: () {
+          AppStorage.clearTourFlags();
           _updateSettings(_settings.copyWith(
             seenDashboardPrompt: false,
             seenPassportPrompt: false,
             seenLogPrompt: false,
+            hasSeenMapTip: false,
+            hasSeenSettingsTip: false,
           ));
           setState(() => _index = 0);
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -917,7 +989,7 @@ Future<void> _resetAppState() async {
           // this correctly triggers on every app reopen, but NOT on the very first ever launch
           // because on the first ever launch _enteredThisSession is false until onboarding is dismissed.
           if (!_showOnboarding && !_quickStartShown) {
-            if (_enteredThisSession || _settings.showQuickStartOnLaunch) {
+            if (_settings.showQuickStartOnLaunch) {
               _showQuickStart(innerContext);
             }
           }

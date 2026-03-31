@@ -39,6 +39,7 @@ class ReflectionRequest(BaseModel):
     felt_good: str = ""
     conditions: str = ""
     notes: str = ""
+    language: str = "en"
 
 @app.post("/api/analyze_reflection")
 async def analyze_reflection(request: ReflectionRequest):
@@ -50,7 +51,8 @@ async def analyze_reflection(request: ReflectionRequest):
             felt_hard=request.felt_hard,
             felt_good=request.felt_good,
             conditions=request.conditions,
-            notes=request.notes
+            notes=request.notes,
+            language=request.language
         )
         return result
     except ValueError as ve:

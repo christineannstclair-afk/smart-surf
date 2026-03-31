@@ -82,6 +82,18 @@ class PassportPresets {
       "metric_en": "60–120cm green waves · point/reef",
       "metric_es": "Olas verdes 60–120cm · point/arrecife"
     },
+    {
+      "en": "4–6ft+ green waves · beach break",
+      "es": "Olas verdes 4–6+ pies · playa",
+      "metric_en": "1.2–1.8m+ green waves · beach break",
+      "metric_es": "Olas verdes 1.2–1.8m+ · playa"
+    },
+    {
+      "en": "4–6ft+ green waves · point/reef",
+      "es": "Olas verdes 4–6+ pies · point/arrecife",
+      "metric_en": "1.2–1.8m+ green waves · point/reef",
+      "metric_es": "Olas verdes 1.2–1.8m+ · point/arrecife"
+    },
   ];
 
    // BOARDS
@@ -163,7 +175,7 @@ class PassportPresets {
 
   // Returns only focus skills that exist in the presets (prevents “hidden 3rd”)
   static List<String> normalizeFocus(List<String> current) {
-    final allowed = focusSkills.map((m) => m["en"]).whereType<String>().toSet();
-    return current.where((s) => allowed.contains(s)).toList();
+    // We now allow custom skills, so we just filter for non-empty and unique
+    return current.where((s) => s.trim().isNotEmpty).toSet().toList();
   }
 }

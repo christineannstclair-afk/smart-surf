@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/translation_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:screenshot/screenshot.dart';
@@ -59,6 +60,7 @@ class SurfPassportScreen extends StatefulWidget {
   final bool seenPassportPrompt;
   final VoidCallback onPromptDismissed;
   final List<SessionLogEntry> logs;
+  final VoidCallback? onReturnToDashboard;
 
   final void Function({
     required String levelEnTitle,
@@ -127,6 +129,7 @@ class SurfPassportScreen extends StatefulWidget {
     required this.onPromptDismissed,
     required this.seenPassportPrompt,
     required this.logs,
+    this.onReturnToDashboard,
   });
 
   @override
@@ -141,6 +144,7 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
   @override
   void initState() {
     super.initState();
+    FirebaseService().logEvent('surf_passport_viewed');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!widget.seenPassportPrompt) {
         OrientationPrompt.show(
@@ -190,7 +194,10 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
           toolbarHeight: 50,
           titleSpacing: 16,
           centerTitle: false,
-          title: const SmartSurfWordmark(isInverse: true),
+          title: SmartSurfWordmark(
+            isInverse: true,
+            onTap: widget.onReturnToDashboard,
+          ),
           actions: [
             LanguageMenu(isSpanish: widget.isSpanish, onSetLanguage: widget.onSetLanguage),
           ],
@@ -226,7 +233,7 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
                               physics: const NeverScrollableScrollPhysics(),
                               mainAxisSpacing: 8,
                               crossAxisSpacing: 8,
-                              childAspectRatio: 2.2,
+                              childAspectRatio: 1.7,
                               children: [
                                 _InfoBlock(
                                   title: _t("Comfort Zone", "Zona de confort"),
@@ -367,7 +374,7 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
         children: [
           Text(
             _t("SURFER SUMMARY", "RESUMEN DEL SURFER"),
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white38, letterSpacing: 0.8),
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 0.8),
           ),
           const SizedBox(height: 6),
           Text(
@@ -424,7 +431,7 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
                   const SizedBox(height: 4),
                   Text(
                     desc,
-                    style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.8), height: 1.2, fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 16, color: Colors.white.withOpacity(0.8), height: 1.2, fontWeight: FontWeight.w500),
                   ),
                 ],
               ],
@@ -490,7 +497,7 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
       children: [
         Text(
           _t("LATEST SESSION MEDIA", "ÚLTIMO MEDIA").toUpperCase(),
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white54, letterSpacing: 1.2),
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 1.2),
         ),
         const SizedBox(height: 10),
         MediaCard(
@@ -521,6 +528,7 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
   Future<void> _sharePassport() async {
     if (_isSharing) return;
     setState(() => _isSharing = true);
+    FirebaseService().logEvent('export_passport');
     try {
       final uint8List = await _screenshotController.capture(pixelRatio: 2.0);
       if (uint8List != null) {
@@ -711,6 +719,7 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
       ageVisibleOnDashboard: ageVisibleOnDashboard ?? widget.ageVisibleOnDashboard,
       latestMediaPath: latestMediaPath ?? widget.latestMediaPath,
       latestMediaType: latestMediaType ?? widget.latestMediaType,
+      email: FirebaseAuth.instance.currentUser?.email,
     );
     FirebaseService().saveFullProfile(data);
   }
@@ -801,28 +810,72 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
               ),
               Expanded(
                 child: ListView(
-                  children: PassportPresets.focusSkills.map((m) {
-                    final en = m["en"]!;
-                    final isSelected = currentFocus.contains(en);
-                    return CheckboxListTile(
-                      title: Text(widget.isSpanish ? m["es"]! : en),
-                      value: isSelected,
-                      onChanged: (val) {
-                        setModalState(() {
-                          warningMsg = null;
-                          if (val == true) {
-                            if (currentFocus.length < 4) {
-                              currentFocus.add(en);
+                  children: [
+                    // Preset Skills
+                    ...PassportPresets.focusSkills.map((m) {
+                      final en = m["en"]!;
+                      final isSelected = currentFocus.contains(en);
+                      return CheckboxListTile(
+                        title: Text(widget.isSpanish ? m["es"]! : en),
+                        value: isSelected,
+                        onChanged: (val) {
+                          setModalState(() {
+                            warningMsg = null;
+                            if (val == true) {
+                              if (currentFocus.length < 4) {
+                                currentFocus.add(en);
+                              } else {
+                                warningMsg = _t("You can choose up to 4 focus skills.", "Puedes elegir hasta 4 habilidades foco.");
+                              }
                             } else {
-                              warningMsg = _t("You can choose up to 4 focus skills.", "Puedes elegir hasta 4 habilidades foco.");
+                              currentFocus.remove(en);
                             }
-                          } else {
-                            currentFocus.remove(en);
+                          });
+                        },
+                      );
+                    }).toList(),
+                    
+                    // Custom Skills (already selected but not in presets)
+                    ...currentFocus.where((s) => !PassportPresets.focusPresetMaps.any((m) => m["en"] == s)).map((custom) {
+                      return CheckboxListTile(
+                        title: Text(custom),
+                        value: true,
+                        onChanged: (val) {
+                          setModalState(() {
+                            if (val == false) {
+                              currentFocus.remove(custom);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+
+                    // Add Custom Option
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: _t("Add custom focus...", "Agregar foco personalizado..."),
+                          prefixIcon: const Icon(Icons.add, size: 20),
+                          border: const OutlineInputBorder(),
+                        ),
+                        onSubmitted: (v) {
+                          if (v.trim().isNotEmpty) {
+                            setModalState(() {
+                              final text = v.trim();
+                              if (currentFocus.contains(text)) {
+                                warningMsg = _t("Skill already added.", "Habilidad ya agregada.");
+                              } else if (currentFocus.length < 4) {
+                                currentFocus.add(text);
+                              } else {
+                                warningMsg = _t("You can choose up to 4 focus skills.", "Puedes elegir hasta 4 habilidades foco.");
+                              }
+                            });
                           }
-                        });
-                      },
-                    );
-                  }).toList(),
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Padding(
@@ -1025,39 +1078,93 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
     required String Function(Map<String, String>) itemTitle,
     String Function(Map<String, String>)? itemSubtitle,
   }) {
+    final customCtrl = TextEditingController();
+    bool showingOther = false;
+    
+    // Check if current value is NOT in the presets
+    final bool isCustom = currentValue.isNotEmpty && !items.any((m) => (m["en"] ?? m["enTitle"]) == currentValue);
+    if (isCustom) {
+      customCtrl.text = currentValue;
+    }
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(title, style: Theme.of(context).textTheme.titleLarge),
-            ),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: items.length,
-                itemBuilder: (ctx, i) {
-                  final item = items[i];
-                  final enVal = item["en"] ?? item["enTitle"];
-                  final isSelected = enVal == currentValue;
-                  return ListTile(
-                    title: Text(itemTitle(item), style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? AppTheme.primary : null)),
-                    subtitle: itemSubtitle != null ? Text(itemSubtitle(item)) : null,
-                    trailing: isSelected ? const Icon(Icons.check, color: AppTheme.primary) : null,
-                    onTap: () {
-                      onSelected(item);
-                      Navigator.pop(ctx);
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+                ),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: items.length + 1,
+                    itemBuilder: (ctx, i) {
+                      if (i == items.length) {
+                        // "Other..." option
+                        final isSelected = showingOther || (isCustom && !showingOther && customCtrl.text.isNotEmpty);
+                        if (showingOther) {
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                            child: TextField(
+                              controller: customCtrl,
+                              autofocus: true,
+                              decoration: InputDecoration(
+                                labelText: _t("Custom Option", "Opción Personalizada"),
+                                border: const OutlineInputBorder(),
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.check, color: AppTheme.primary),
+                                  onPressed: () {
+                                    if (customCtrl.text.trim().isNotEmpty) {
+                                      onSelected({"en": customCtrl.text.trim()});
+                                      Navigator.pop(ctx);
+                                    }
+                                  },
+                                ),
+                              ),
+                              onSubmitted: (v) {
+                                if (v.trim().isNotEmpty) {
+                                  onSelected({"en": v.trim()});
+                                  Navigator.pop(ctx);
+                                }
+                              },
+                            ),
+                          );
+                        }
+                        return ListTile(
+                          leading: const Icon(Icons.edit_note_rounded, color: Colors.white54),
+                          title: Text(_t("Other...", "Otro..."), style: TextStyle(color: isSelected ? AppTheme.primary : null)),
+                          trailing: isSelected ? const Icon(Icons.check, color: AppTheme.primary) : null,
+                          onTap: () => setModalState(() => showingOther = true),
+                        );
+                      }
+
+                      final item = items[i];
+                      final enVal = item["en"] ?? item["enTitle"];
+                      final isSelected = !showingOther && enVal == currentValue;
+                      return ListTile(
+                        title: Text(itemTitle(item), style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? AppTheme.primary : null)),
+                        subtitle: itemSubtitle != null ? Text(itemSubtitle(item)) : null,
+                        trailing: isSelected ? const Icon(Icons.check, color: AppTheme.primary) : null,
+                        onTap: () {
+                          onSelected(item);
+                          Navigator.pop(ctx);
+                        },
+                      );
                     },
-                  );
-                },
-              ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
             ),
-            const SizedBox(height: 20),
-          ],
+          ),
         ),
       ),
     );
@@ -1208,12 +1315,14 @@ class _InfoBlock extends StatelessWidget {
                   children: [
                     Text(
                       title.toUpperCase(),
-                      style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white38, letterSpacing: 0.8),
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 0.8),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       value,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -1252,7 +1361,7 @@ class _FocusChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w700),
+        style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w700),
       ),
     );
   }

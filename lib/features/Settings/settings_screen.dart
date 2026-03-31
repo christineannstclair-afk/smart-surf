@@ -17,7 +17,6 @@ final AppSettings settings;
 final ValueChanged<AppSettings> onChanged;
 final VoidCallback onResetQuickstart;
 final VoidCallback onOpenSurferPro;
-final VoidCallback onOpenCoachDashboard;
 final VoidCallback onRunTour;
 final VoidCallback onResetSessions;
 final VoidCallback onResetAppState;
@@ -28,7 +27,6 @@ required this.settings,
 required this.onChanged,
 required this.onResetQuickstart,
 required this.onOpenSurferPro,
-required this.onOpenCoachDashboard,
 required this.onRunTour,
 required this.onResetSessions,
 required this.onResetAppState,
@@ -65,38 +63,24 @@ _t(
 'Esto eliminará permanentemente todos tus spots, sesiones y configuraciones del pasaporte. Esta acción no se puede deshacer.',
 ),
 ),
-actions: [
-TextButton(
-onPressed: () => Navigator.pop(ctx),
-child: Text(_t('Cancel', 'Cancelar')),
-),
-TextButton(
-onPressed: () async {
-Navigator.pop(ctx);
-final prefs = await SharedPreferences.getInstance();
-await prefs.clear();
-if (context.mounted) {
-ScaffoldMessenger.of(context).showSnackBar(
-SnackBar(
-content: Text(
-_t(
-'Data cleared. Please restart the app.',
-'Datos borrados. Por favor, reinicia la app.',
-),
-),
-behavior: SnackBarBehavior.floating,
-),
-);
-}
-},
-child: Text(
-_t('Reset Data', 'Restablecer Datos'),
-style: const TextStyle(color: Colors.red),
-),
-),
-],
-),
-);
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text(_t('Cancel', 'Cancelar')),
+        ),
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(ctx);
+            onResetAppState();
+          },
+          child: Text(
+            _t('Reset Data', 'Restablecer Datos'),
+            style: const TextStyle(color: Colors.red),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 void _confirmResetSessions(BuildContext context) {
@@ -194,8 +178,8 @@ children: [
 MicroTipBanner(
 prefKey: 'hasSeenSettingsTip',
 message: _t(
-'Customize the app here - language, units, and data options are all in one place.',
-'Personaliza la app aquí - idioma, unidades y opciones de datos, todo en un lugar.',
+'Manage your experience here—options for QuickStart, signing out, resetting data or the tour, exploring Coach Pro, and legal info.',
+'Gestiona tu experiencia aquí: opciones para QuickStart, cerrar sesión, restablecer datos o el tour, explorar Coach Pro e información legal.',
 ),
 dismissLabel: _t('Got it', 'Entendido'),
 ),
@@ -203,35 +187,8 @@ const Padding(
 padding: EdgeInsets.symmetric(horizontal: 16),
 child: Divider(height: 1),
 ),
-_SectionHeader(title: _t('Preferences', 'Preferencias')),
-ListTile(
-leading: const Icon(Icons.straighten),
-title: Text(
-_t('Units', 'Unidades'),
-style: Theme.of(context).textTheme.titleMedium,
-),
-trailing: SegmentedButton<String>(
-showSelectedIcon: false,
-segments: [
-ButtonSegment(
-value: 'imperial',
-label: Text(_t('ft/mph', 'ft/mph')),
-),
-ButtonSegment(
-value: 'metric',
-label: Text(_t('m/kph', 'm/kph')),
-),
-],
-selected: {settings.units},
-onSelectionChanged: (set) =>
-onChanged(settings.copyWith(units: set.first)),
-),
-),
-const Padding(
-padding: EdgeInsets.symmetric(horizontal: 16),
-child: Divider(height: 1),
-),
-ListTile(
+
+    ListTile(
 leading: const Icon(Icons.auto_awesome, color: Colors.amber),
 title: Text(
 _t('Surfer Pro', 'Surfer Pro'),
@@ -244,46 +201,34 @@ _t(
 ),
 style: Theme.of(context).textTheme.bodySmall,
 ),
-trailing: const Icon(Icons.chevron_right),
+trailing: Container(
+padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+decoration: BoxDecoration(
+color: settings.isSurferPro
+? Colors.blue.withOpacity(0.15)
+: Colors.grey.withOpacity(0.15),
+borderRadius: BorderRadius.circular(12),
+),
+child: Text(
+settings.isSurferPro
+? (settings.isSurferTrial 
+    ? _t('Trial Active', 'Prueba Activa')
+    : _t('Pro Active', 'Pro Activa'))
+: _t('Get Pro', 'Obtener Pro'),
+style: TextStyle(
+color: settings.isSurferPro ? Colors.blue : Colors.grey,
+fontWeight: FontWeight.bold,
+fontSize: 12,
+),
+),
+),
 onTap: onOpenSurferPro,
 ),
-ListTile(
-leading: const Icon(Icons.groups, color: Colors.blue),
-title: Text(
-_t('Coach Dashboard', 'Panel de Coach'),
-style: Theme.of(context).textTheme.titleMedium,
-),
-subtitle: Text(
-_t('Manage your athletes', 'Gestiona a tus atletas'),
-style: Theme.of(context).textTheme.bodySmall,
-),
-trailing: const Icon(Icons.chevron_right),
-onTap: onOpenCoachDashboard,
-),
-ListTile(
-leading: const Icon(Icons.map_outlined),
-title: Text(
-_t('Default Map', 'Mapa Inicial'),
-style: Theme.of(context).textTheme.titleMedium,
-),
-trailing: SegmentedButton<String>(
-showSelectedIcon: false,
-segments: [
-ButtonSegment(
-value: 'last_viewed',
-label: Text(_t('Last viewed', 'Último')),
-),
-ButtonSegment(
-value: 'default_region',
-label: Text(_t('Default', 'Por defecto')),
-),
-],
-selected: {settings.defaultMapMode},
-onSelectionChanged: (set) =>
-onChanged(settings.copyWith(defaultMapMode: set.first)),
-),
-),
-SwitchListTile(
+    const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: Divider(height: 1),
+    ),
+    SwitchListTile(
 secondary: const Icon(Icons.rocket_launch_outlined),
 title: Text(
 _t('Show QuickStart on launch', 'Mostrar Atajo al Inicio'),
@@ -304,40 +249,8 @@ const Padding(
 padding: EdgeInsets.symmetric(horizontal: 16),
 child: Divider(height: 1),
 ),
-_SectionHeader(title: _t('Appearance', 'Apariencia')),
-ListTile(
-leading: const Icon(Icons.dark_mode_outlined),
-title: Text(
-_t('Theme', 'Tema'),
-style: Theme.of(context).textTheme.titleMedium,
-),
-subtitle: Text(
-_t(
-'Light / Dark Mode (Coming soon)',
-'Modo Claro / Oscuro (Próximamente)',
-),
-style: Theme.of(context).textTheme.bodySmall,
-),
-onTap: null,
-),
-const Padding(
-padding: EdgeInsets.symmetric(horizontal: 16),
-child: Divider(height: 1),
-),
 _SectionHeader(title: _t('Data', 'Datos')),
-Padding(
-padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-child: Text(
-_t(
-'Hosted app: data persists normally. Debug runs via `flutter run -d chrome` may appear like a reset.',
-'App alojada: los datos persisten normalmente. Las ejecuciones de depuración a través de `flutter run -d chrome` pueden parecer un restablecimiento.',
-),
-style: Theme.of(context)
-.textTheme
-.bodySmall
-?.copyWith(fontSize: 12),
-),
-),
+
 ListTile(
 leading: const Icon(Icons.download_outlined),
 title: Text(
@@ -378,23 +291,7 @@ _t(
 ),
 onTap: () => _confirmSignOut(context),
 ),
-ListTile(
-leading: const Icon(Icons.outbox_rounded, color: Colors.orange),
-title: Text(
-_t('Show Cover on Next Launch', 'Mostrar Portada al Inicio'),
-style: const TextStyle(
-color: Colors.orange,
-fontWeight: FontWeight.w600,
-),
-),
-subtitle: Text(
-_t(
-'Log out of app and return to cover screen.',
-'Salir de la app y volver a la portada.',
-),
-),
-onTap: onResetAppState,
-),
+
 ListTile(
 leading: const Icon(Icons.tour_outlined, color: Colors.teal),
 title: Text(
@@ -446,8 +343,8 @@ style: const TextStyle(fontWeight: FontWeight.w600),
 ),
 subtitle: Text(
 _t(
-'Exclusive features for coaches - ${SubscriptionConfig.coachMonthlyStr}/mo',
-'Funciones exclusivas para coaches - ${SubscriptionConfig.coachMonthlyStr}/mes',
+'Exclusive features for coaches (Coming Soon) - ${SubscriptionConfig.coachMonthlyStr}/mo',
+'Funciones exclusivas para coaches (Próximamente) - ${SubscriptionConfig.coachMonthlyStr}/mes',
 ),
 ),
 trailing: Container(
@@ -471,40 +368,6 @@ fontSize: 12,
 ),
 onTap: () => showCoachProModal(context, isSpanish),
 ),
-ListTile(
-leading: const Icon(
-Icons.qr_code_scanner_rounded,
-color: Colors.amber,
-),
-title: Text(
-_t('Coach Scan (Preview)', 'Escáner Coach (Previa)'),
-style: const TextStyle(fontWeight: FontWeight.w600),
-),
-subtitle: Text(
-_t(
-'Simulate a coach-only action',
-'Simular una acción solo para coaches',
-),
-),
-trailing: const Icon(Icons.chevron_right, size: 20),
-onTap: () {
-if (!settings.isCoachPro) {
-showCoachProModal(context, isSpanish);
-} else {
-ScaffoldMessenger.of(context).showSnackBar(
-SnackBar(
-content: Text(
-_t(
-'Scanner preview opened!',
-'¡Vista previa del escáner abierta!',
-),
-),
-behavior: SnackBarBehavior.floating,
-),
-);
-}
-},
-),
 const Padding(
 padding: EdgeInsets.symmetric(horizontal: 16),
 child: Divider(height: 1),
@@ -518,8 +381,8 @@ style: TextStyle(fontWeight: FontWeight.w600),
 ),
 subtitle: Text(
 _t(
-'The ultimate tool for athletes to monitor performance, analyze wave dynamics, and connect with the global surf community.',
-'La herramienta definitiva para que los atletas monitoreen su rendimiento, analicen la dinámica de las olas y se conecten con la comunidad global del surf.',
+'This app helps surfers log sessions, reflect on their surfing, track progress over time, and build their personal Surf Passport. Surfer Pro adds AI-powered reflections and deeper insight after each session.',
+'Esta aplicación ayuda a los surfistas a registrar sesiones, reflexionar sobre su surf, seguir su progreso en el tiempo y construir su Pasaporte de Surf. Surfer Pro añade reflexiones con IA e información profunda después de cada sesión.',
 ),
 ),
 ),

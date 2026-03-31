@@ -14,6 +14,7 @@ import '../../core/subscription_config.dart';
 import '../../ui_system/upgrade_bottom_sheet.dart';
 import '../../core/analyze_api.dart';
 import 'ai_analysis_screen.dart';
+import '../session_log/firebase_service.dart';
 
 void showSurferProModal({
   required BuildContext context,
@@ -69,13 +70,39 @@ class _SurferProUpgradeContentState extends State<SurferProUpgradeContent> {
   String t(String en, String es) => widget.isSpanish ? es : en;
 
   void _generateReflection() async {
-    if (_workingOnCtrl.text.isEmpty) return;
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (ctx) => const AlertDialog(title: Text('Proof: Button Fired _generateReflection!')),
+      );
+    }
+
+    final hasInput = _workingOnCtrl.text.trim().isNotEmpty ||
+                     _feltHardCtrl.text.trim().isNotEmpty ||
+                     _feltGoodCtrl.text.trim().isNotEmpty;
+
+    if (!hasInput) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.isSpanish 
+                ? 'Añade al menos un detalle para generar el insight con IA.' 
+                : 'Add at least one session detail to generate AI insight.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() => _isGenerating = true);
     
     String? finalSummary;
     String? finalProgressPattern;
     String? finalNextFocus;
+    String? summaryEs;
+    String? progressEs;
+    String? nextFocusEs;
 
     try {
       final aiResult = await AnalyzeApi.analyzeReflection(
@@ -85,18 +112,32 @@ class _SurferProUpgradeContentState extends State<SurferProUpgradeContent> {
         feltGood: _feltGoodCtrl.text,
         conditions: '',
         notes: '',
+        language: widget.isSpanish ? 'es' : 'en',
       );
-      finalSummary = aiResult['session_insight'] as String?;
-      finalProgressPattern = aiResult['progress_pattern'] as String?;
-      finalNextFocus = aiResult['next_session_focus'] as String?;
+      finalSummary = (aiResult['session_insight_en'] ?? (widget.isSpanish ? null : aiResult['session_insight'])) as String?;
+      finalProgressPattern = (aiResult['progress_pattern_en'] ?? (widget.isSpanish ? null : aiResult['progress_pattern'])) as String?;
+      finalNextFocus = (aiResult['next_session_focus_en'] ?? (widget.isSpanish ? null : aiResult['next_session_focus'])) as String?;
+
+      summaryEs = (aiResult['session_insight_es'] ?? (widget.isSpanish ? aiResult['session_insight'] : null)) as String?;
+      progressEs = (aiResult['progress_pattern_es'] ?? (widget.isSpanish ? aiResult['progress_pattern'] : null)) as String?;
+      nextFocusEs = (aiResult['next_session_focus_es'] ?? (widget.isSpanish ? aiResult['next_session_focus'] : null)) as String?;
+
+      
+      if (finalSummary != null && finalSummary.isNotEmpty) {
+        print("REAL AI BILINGUAL RESPONSE RECEIVED");
+      }
     } catch (e) {
       debugPrint("LLM API failed or timed out: \$e");
+      print("BACKEND CALL FAILED");
     }
 
     // Graceful fallback to _simulate models if API fails
-    finalSummary ??= _simulateAISummary(_workingOnCtrl.text, _feltHardCtrl.text, _feltGoodCtrl.text);
-    finalProgressPattern ??= '';
-    finalNextFocus ??= _simulateAINextFocus(_workingOnCtrl.text, _feltHardCtrl.text);
+    if (finalSummary == null || finalSummary!.isEmpty) {
+      print("FALLBACK MOCK RESPONSE USED");
+      finalSummary = _simulateAISummary(_workingOnCtrl.text, _feltHardCtrl.text, _feltGoodCtrl.text);
+      finalProgressPattern = '';
+      finalNextFocus = _simulateAINextFocus(_workingOnCtrl.text, _feltHardCtrl.text);
+    }
 
     final reflection = SessionReflection(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -104,12 +145,19 @@ class _SurferProUpgradeContentState extends State<SurferProUpgradeContent> {
       workingOn: _workingOnCtrl.text,
       whatFeltHard: _feltHardCtrl.text,
       whatFeltGood: _feltGoodCtrl.text,
-      aiSummary: finalSummary,
-      aiProgressPattern: finalProgressPattern,
-      aiNextFocus: finalNextFocus,
+      aiSummary: finalSummary ?? '',
+      aiProgressPattern: finalProgressPattern ?? '',
+      aiNextFocus: finalNextFocus ?? '',
+      aiSummaryEn: widget.isSpanish ? null : finalSummary,
+      aiSummaryEs: summaryEs,
+      aiProgressPatternEn: widget.isSpanish ? null : finalProgressPattern,
+      aiProgressPatternEs: progressEs,
+      aiNextFocusEn: widget.isSpanish ? null : finalNextFocus,
+      aiNextFocusEs: nextFocusEs,
     );
 
     widget.onAddReflection(reflection);
+    FirebaseService().logEvent('ai_reflection_used');
 
     setState(() {
       _isGenerating = false;
@@ -231,6 +279,7 @@ class _SurferProUpgradeContentState extends State<SurferProUpgradeContent> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -284,7 +333,7 @@ class _SurferProUpgradeContentState extends State<SurferProUpgradeContent> {
             const SizedBox(height: 48),
             _SectionTitle(title: t("Past Reflections", "Reflexiones Pasadas")),
             const SizedBox(height: 16),
-            ...widget.reflections.map((r) => _ReflectionCard(reflection: r, isSpanish: widget.isSpanish)),
+            ...widget.reflections.map((r) => _ReflectionCard(reflection: r, isSpanish: widget.isSpanish, totalSessions: widget.reflections.length)),
           ],
         ],
       ),
@@ -588,7 +637,8 @@ class _LockedFeature extends StatelessWidget {
 class _ReflectionCard extends StatelessWidget {
   final SessionReflection reflection;
   final bool isSpanish;
-  _ReflectionCard({required this.reflection, required this.isSpanish});
+  final int totalSessions;
+  _ReflectionCard({required this.reflection, required this.isSpanish, required this.totalSessions});
 
   final ScreenshotController _screenshotController = ScreenshotController();
 
@@ -656,14 +706,24 @@ class _ReflectionCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    reflection.aiSummary,
+                    isSpanish 
+                      ? (reflection.aiSummaryEs ?? "") 
+                      : (reflection.aiSummaryEn ?? reflection.aiSummary),
                     style: const TextStyle(height: 1.5, fontSize: 15),
                   ),
-                  if (reflection.aiProgressPattern.isNotEmpty) ...[
+                  if (totalSessions >= 3 && reflection.aiProgressPattern.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text(
-                      reflection.aiProgressPattern,
+                      isSpanish
+                        ? (reflection.aiProgressPatternEs ?? "")
+                        : (reflection.aiProgressPatternEn ?? reflection.aiProgressPattern),
                       style: const TextStyle(height: 1.5, fontSize: 15, fontStyle: FontStyle.italic),
+                    ),
+                  ] else if (totalSessions < 3) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      isSpanish ? "Registra más sesiones para desbloquear patrones." : "Log more sessions to unlock patterns.",
+                      style: TextStyle(height: 1.5, fontSize: 13, fontStyle: FontStyle.italic, color: colorScheme.onSurfaceVariant.withOpacity(0.7)),
                     ),
                   ],
                   const SizedBox(height: 20),
@@ -700,7 +760,9 @@ class _ReflectionCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          reflection.aiNextFocus,
+                          isSpanish
+                            ? (reflection.aiNextFocusEs ?? "")
+                            : (reflection.aiNextFocusEn ?? reflection.aiNextFocus),
                           style: const TextStyle(fontSize: 14, height: 1.4),
                         ),
                       ],
