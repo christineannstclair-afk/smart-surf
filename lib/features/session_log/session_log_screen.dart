@@ -927,10 +927,39 @@ class SessionLogScreenState extends State<SessionLogScreen> {
               // Primary CTA — value first
               FilledButton(
                 onPressed: () async {
+                  debugPrint('[FirstInsight] See my insight tapped');
+                  debugPrint('[FirstInsight] Dismissing first insight modal');
                   Navigator.pop(ctx);
+
+                  // Mark prompt as seen so it won't re-trigger
                   if (widget.onInsightPromptSeen != null) widget.onInsightPromptSeen!();
-                  if (widget.onUnlockFirstInsight != null) {
-                    await widget.onUnlockFirstInsight!();
+
+                  // Get the most recent completed session
+                  final latestSession = widget.logs.isNotEmpty
+                      ? widget.logs.firstWhere(
+                          (e) => e.isCompleted,
+                          orElse: () => widget.logs.first,
+                        )
+                      : null;
+
+                  if (latestSession == null) {
+                    debugPrint('[FirstInsight] Reflection failed: no session found');
+                    return;
+                  }
+
+                  debugPrint('[FirstInsight] Opening reflection for sessionId: ${latestSession.id}');
+
+                  try {
+                    // openAddSessionSheet with startStep=1 opens the reflection form,
+                    // then on submit calls _handleGenerateInsight which shows InsightPayoffScreen
+                    await openAddSessionSheet(
+                      existing: latestSession,
+                      startStep: 1,
+                      skipSuccessScreen: true,
+                    );
+                    debugPrint('[FirstInsight] Reflection opened successfully');
+                  } catch (e) {
+                    debugPrint('[FirstInsight] Reflection failed: $e');
                   }
                 },
                 style: FilledButton.styleFrom(
