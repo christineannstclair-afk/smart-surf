@@ -6,11 +6,28 @@ import 'package:flutter/foundation.dart';
 class AnalyzeApi {
   // Uses live API in production (TestFlight/App Store)
   static const String _baseUrl = 'https://smart-surf-backend.onrender.com';
+  
+  // ZERO-SPEND TEST MODE: Flip to TRUE to test UI limits without spending AI tokens.
+  // Flip to FALSE for production.
+  static const bool isTestMode = false;
 
   static Future<Map<String, dynamic>> uploadAndAnalyze(
     XFile videoFile, {
+    required String idToken,
+    required String sessionId,
     required Function(double) onProgress,
   }) async {
+    if (isTestMode) {
+      await Future.delayed(const Duration(seconds: 2));
+      onProgress(1.0);
+      return {
+        "confidence_score": 0.85,
+        "metrics": {"popup_time_seconds": 1.2, "knee_angle_min": 115, "stance_width_ratio": 1.1, "back_angle_at_stand": 45, "stability_score": 88},
+        "feedback": {"looks_solid": true, "primary_improvement": "Great job! Your pop-up is fast.", "drill_to_practice": "Practice your bottom turn now."},
+        "note": "MOCK RESPONSE (ZERO SPEND)"
+      };
+    }
+
     final uri = Uri.parse('$_baseUrl/api/analyze_popup');
     final request = http.MultipartRequest('POST', uri);
 
@@ -29,6 +46,8 @@ class AnalyzeApi {
       filename: videoFile.name,
     );
 
+    request.headers['Authorization'] = 'Bearer $idToken';
+    request.fields['session_id'] = sessionId;
     request.files.add(multipartFile);
 
     try {
@@ -59,6 +78,8 @@ class AnalyzeApi {
   }
 
   static Future<Map<String, dynamic>> analyzeReflection({
+    required String idToken,
+    required String sessionId,
     required String focus,
     required String workedOn,
     required String feltHard,
@@ -66,15 +87,36 @@ class AnalyzeApi {
     required String conditions,
     required String notes,
     required String language,
+    String? waveHeight,
+    String? board,
   }) async {
+    if (isTestMode) {
+      await Future.delayed(const Duration(seconds: 1));
+      return {
+        "session_insight_en": "It sounds like you had some good moments out there — the wave selection is feeling more natural. The timing of the pop-up still seems a bit hit or miss, which is super normal at this stage.",
+        "progress_pattern_en": "Feels like things are starting to click, just not quite all at once yet.",
+        "next_session_focus_en": "Next time, try popping up a touch earlier and see how that feels.",
+        "session_insight_es": "Parece que tuviste buenos momentos — la selección de olas se está sintiendo más natural. El timing del pop-up todavía parece un poco variable, lo cual es muy normal en esta etapa.",
+        "progress_pattern_es": "Parece que las cosas están empezando a encajar, solo que no del todo a la vez.",
+        "next_session_focus_es": "La próxima vez, intenta levantarte un poco antes y fíjate cómo se siente.",
+        "focus_tag_en": "POP-UP TIMING",
+        "focus_tag_es": "TIMING DE DESPEGUE",
+        "note": "MOCK RESPONSE (ZERO SPEND)"
+      };
+    }
+
     final uri = Uri.parse('$_baseUrl/api/analyze_reflection');
     
     try {
       debugPrint("AnalyzeApi: CALLING REAL AI BACKEND for reflection...");
       final response = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
         body: jsonEncode({
+          'session_id': sessionId,
           'focus': focus,
           'worked_on': workedOn,
           'felt_hard': feltHard,
@@ -82,6 +124,8 @@ class AnalyzeApi {
           'conditions': conditions,
           'notes': notes,
           'language': language,
+          'wave_height': waveHeight,
+          'board': board,
         }),
       ).timeout(const Duration(seconds: 30)); 
 
