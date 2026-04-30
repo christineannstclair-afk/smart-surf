@@ -1091,18 +1091,23 @@ class HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 12),
                   Text(
                     subtext,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: AppTheme.textMuted,
-                      height: 1.5,
-                      foreground: showLockedTeaser
-                        ? (Paint()..shader = ui.Gradient.linear(
-                            const Offset(0, 0),
-                            const Offset(0, 40),
-                            [Colors.white.withOpacity(0.9), Colors.white.withOpacity(0.0)],
-                          ))
-                        : null,
-                    ),
+                    style: showLockedTeaser
+                      ? TextStyle(
+                          fontSize: 15,
+                          height: 1.5,
+                          // foreground only — color must be null when foreground is set
+                          foreground: Paint()
+                            ..shader = ui.Gradient.linear(
+                              const Offset(0, 0),
+                              const Offset(0, 40),
+                              [Colors.white.withOpacity(0.9), Colors.white.withOpacity(0.0)],
+                            ),
+                        )
+                      : const TextStyle(
+                          fontSize: 15,
+                          color: AppTheme.textMuted,
+                          height: 1.5,
+                        ),
                     maxLines: showLockedTeaser ? 2 : null,
                     overflow: showLockedTeaser ? TextOverflow.clip : null,
                   ),
