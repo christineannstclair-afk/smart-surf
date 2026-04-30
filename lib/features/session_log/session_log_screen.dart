@@ -872,14 +872,118 @@ class SessionLogScreenState extends State<SessionLogScreen> {
   void _handlePostSessionFlow(int sessionCount) {
     if (!mounted) return;
 
-    // STATE-BASED: only trigger passport prompt on session 1.
-    // First-insight nudge is handled by the home screen card (state-based, not count-based).
+    // --- FIRST INSIGHT TRIGGER ---
+    final bool shouldTriggerFirstInsight =
+        !widget.isSurferPro &&
+        sessionCount >= 4 &&
+        !widget.hasSeenFirstInsightPrompt &&
+        !widget.hasUsedFirstFreeAIInsight;
+
+    if (shouldTriggerFirstInsight) {
+      debugPrint('[PopupTrigger] First insight trigger fired — sessionCount=$sessionCount');
+      _triggerFirstInsightPrompt();
+      return;
+    } else {
+      if (widget.isSurferPro) {
+        debugPrint('[PopupTrigger] First insight trigger skipped: user is Pro');
+      } else if (sessionCount < 4) {
+        debugPrint('[PopupTrigger] First insight trigger skipped: sessionCount=$sessionCount < 4');
+      } else if (widget.hasSeenFirstInsightPrompt) {
+        debugPrint('[PopupTrigger] First insight trigger skipped: hasSeenFirstInsightPrompt=true');
+      } else if (widget.hasUsedFirstFreeAIInsight) {
+        debugPrint('[PopupTrigger] First insight trigger skipped: hasUsedFirstFreeAIInsight=true');
+      }
+    }
+
+    // --- PASSPORT PROMPT (session 1 only) ---
     if (sessionCount == 1 && !widget.hasSeenPostFirstSessionPassportPrompt) {
       debugPrint('[PopupTrigger] source=passport_prompt sessionCount=$sessionCount');
       _triggerPassportPrompt();
     }
-    // sessionCount == 4 insight popup REMOVED — replaced by home screen state-based card.
   }
+
+  void _triggerFirstInsightPrompt() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        title: Text(
+          t("Get your first surf insight", "Tu primer insight de surf"),
+          style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+        ),
+        content: Text(
+          t(
+            "We turned your session into a quick insight. Take a look, then decide if you want more.",
+            "Convertimos tu sesión en un insight rápido. Échale un vistazo y decide si quieres más.",
+          ),
+          style: const TextStyle(color: Color(0xFF475569), height: 1.4),
+        ),
+        actions: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Primary CTA — value first
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  if (widget.onInsightPromptSeen != null) widget.onInsightPromptSeen!();
+                  if (widget.onUnlockFirstInsight != null) {
+                    await widget.onUnlockFirstInsight!();
+                  }
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(
+                  t("See my insight", "Ver mi insight"),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Secondary CTA — trial, deprioritized
+              OutlinedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (widget.onInsightPromptSeen != null) widget.onInsightPromptSeen!();
+                  if (widget.onOpenSurferPro != null) widget.onOpenSurferPro!();
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0F172A),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: Text(
+                  t("Start 3-day free trial", "Comenzar prueba de 3 días"),
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+              ),
+              // Tertiary — not now
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (widget.onInsightPromptSeen != null) widget.onInsightPromptSeen!();
+                },
+                child: Text(
+                  t("Not now", "Ahora no"),
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
 
   void _triggerPassportPrompt() {
     showDialog(
@@ -926,11 +1030,7 @@ class SessionLogScreenState extends State<SessionLogScreen> {
     );
   }
 
-  // _triggerFirstInsightPrompt() REMOVED.
-  // Session-count-based insight popup (sessionCount == 4) has been replaced by
-  // the state-based _buildFirstInsightCard() in home_screen.dart.
-  // Logic: show card if user has 3+ sessions AND has never seen an insight.
-  // No modal popup is triggered from session count.
+
 
   void _openSurfPassportEdit() {
     SurfPassportEditSheet.show(
