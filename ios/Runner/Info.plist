@@ -75,5 +75,11 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Smart Surf needs camera access to let you take profile photos and record surf session clips for AI analysis.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Smart Surf needs access to your photo library so you can upload existing surf photos and videos to your passport.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Smart Surf needs microphone access to capture audio when you record surf clips for analysis.</string>
 </dict>
 </plist>

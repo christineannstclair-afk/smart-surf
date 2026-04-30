@@ -33,6 +33,8 @@ class AppStorage {
   static const _spotsKey = 'surf_spots_v1';
   static const _reflectionsKey = 'surfer_reflections_v1';
   static const _aiAnalysisKey = 'surfer_ai_analysis_v1';
+  static const _aiUsageCountKey = 'ai_usage_count_v1';
+  static const _aiLastUsageDateKey = 'ai_last_usage_date_v1';
 
   static const _currentAppVersion = '1.0.1';
   static const _currentAppEnvId = 'prod-2026-03-13'; // Increment to force clean slate for unauth users
@@ -50,8 +52,11 @@ class AppStorage {
       hasSeenGuidedTour: false,
       seenDashboardPrompt: false,
       seenLogPrompt: false,
-      seenPassportPrompt: false,
-      showQuickStartOnLaunch: true,
+      hasSeenMapTip: false,
+      hasSeenSettingsTip: false,
+      hasSeenDashboardGuidance: false,
+      hasSeenPassportGuidance: false,
+      hasSeenProfileNudge: false,
       appVersion: _currentAppVersion,
       appEnvId: _currentAppEnvId,
       units: 'imperial',
@@ -114,7 +119,7 @@ class AppStorage {
       comfortZone: "",
       board: "",
       focusSkills: [],
-      stance: "Regular",
+      stance: "",
       height: "",
       weight: "",
       location: "",
@@ -279,5 +284,28 @@ class AppStorage {
     final prefs = await SharedPreferences.getInstance();
     // Clear everything including keys we might not track in loadAll
     await prefs.clear();
+  }
+
+  // --- AI Usage Shield (Local Guardrail) ---
+  
+  static Future<int> getAiUsageCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toUtc().toString().split(' ')[0]; // YYYY-MM-DD
+    final lastDate = prefs.getString(_aiLastUsageDateKey);
+    
+    if (lastDate != today) {
+      // New day, reset local counter
+      await prefs.setInt(_aiUsageCountKey, 0);
+      await prefs.setString(_aiLastUsageDateKey, today);
+      return 0;
+    }
+    
+    return prefs.getInt(_aiUsageCountKey) ?? 0;
+  }
+
+  static Future<void> incrementAiUsageCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = await getAiUsageCount();
+    await prefs.setInt(_aiUsageCountKey, current + 1);
   }
 }

@@ -23,23 +23,13 @@ class AiInsightService {
     final pattern = _detectPatterns(session, previousLogs, isSpanish);
 
     return {
-      'summaryEn': _sessionInsightEn(interpretation: interpretation, topic: topic),
-      'patternEn': _progressPatternEn(
-        totalSessions: totalSessions, 
-        pattern: pattern, 
-        interpretation: interpretation,
-        topic: topic
-      ),
-      'nextFocusEn': _nextFocusEn(interpretation: interpretation, topic: topic),
+      'summaryEn': _workedOnEn(interpretation: interpretation),
+      'patternEn': _whatHappenedEn(interpretation: interpretation),
+      'nextFocusEn': _tryThisNextEn(interpretation: interpretation),
       
-      'summaryEs': _sessionInsightEs(interpretation: interpretation, topic: topic),
-      'patternEs': _progressPatternEs(
-        totalSessions: totalSessions, 
-        pattern: pattern, 
-        interpretation: interpretation,
-        topic: topic
-      ),
-      'nextFocusEs': _nextFocusEs(interpretation: interpretation, topic: topic),
+      'summaryEs': _workedOnEs(interpretation: interpretation),
+      'patternEs': _whatHappenedEs(interpretation: interpretation),
+      'nextFocusEs': _tryThisNextEs(interpretation: interpretation),
     };
   }
 
@@ -47,96 +37,53 @@ class AiInsightService {
   // English generators
   // ─────────────────────────────────────────────────────────────────────────
 
-  static String _sessionInsightEn({
-    required _SessionInterpretation interpretation,
-    required _CoachingTopic topic,
-  }) {
-    if (interpretation.isVague) {
-      return "It sounds like that session had a lot going on at once. That's normal when you're learning to read the water.";
+  static String _workedOnEn({required _SessionInterpretation interpretation}) {
+    final good = interpretation.feltGood.toLowerCase();
+    final hard = interpretation.challenging.toLowerCase();
+    final trying = interpretation.tryingToDo.toLowerCase();
+    
+    if (good.isNotEmpty && hard.isNotEmpty && trying.isNotEmpty) {
+      return "You were $good and trying to $hard on your $trying.";
+    } else if (good.isNotEmpty && trying.isNotEmpty) {
+      return "You were $good while working on your $trying.";
+    } else if (trying.isNotEmpty) {
+      return "You were focusing on $trying during your session today.";
     }
+    return "You spent some good time practicing in the water today.";
+  }
 
-    final envContext = interpretation.environmentalContext.isNotEmpty 
-        ? " Given the ${interpretation.environmentalContext} conditions, " 
-        : " ";
+  static String _whatHappenedEn({required _SessionInterpretation interpretation}) {
+    final good = interpretation.feltGood.toLowerCase();
+    final hard = interpretation.challenging.toLowerCase();
+    
+    if (good.isNotEmpty && hard.isNotEmpty) {
+      return "It sounds like $good was a success, but $hard was the tricky part.";
+    } else if (hard.isNotEmpty) {
+      return "It seems like $hard was a bit of a challenge during this session.";
+    }
+    return "Every session helps you get a little more comfortable in the waves.";
+  }
 
+  static String _tryThisNextEn({required _SessionInterpretation interpretation}) {
     switch (interpretation.topic) {
       case _CoachingTopic.waveSelection:
-        return "Improving your wave selection is the foundation of a good ride.${envContext}Watching the sets and choosing stronger waves sets you up for much better positioning.";
-      case _CoachingTopic.lineupAwareness:
-        return "Navigating the lineup effectively is just as important as riding the wave.${envContext}Understanding priority and finding your spot helps you catch waves without fighting the crowd.";
+        return "Next time, you could try watching the waves from the beach for a few minutes to see where they break most often.";
       case _CoachingTopic.paddlingCatchingWaves:
-        return "Catching waves earlier requires focused paddle speed.${envContext}Matching the wave's energy with strong, deep strokes ensures you don't get left behind.";
+        return "Next session, it could help to try starting your paddle just a little bit earlier to catch the wave.";
       case _CoachingTopic.popUpTakeoffTiming:
-        return "A stable ride starts with a controlled pop-up.${envContext}Focusing on your takeoff timing prevents nose dives and gets you to your feet before the wave gets too steep.";
+        return "Next time, you could try focusing on bringing your feet through in one smooth motion as you feel the wave's push.";
       case _CoachingTopic.balanceStability:
-        return "Staying on your feet requires a solid, centered stance.${envContext}Focusing on your balance and keeping your knees bent helps absorb the bumps for a more stable ride.";
-      case _CoachingTopic.generatingMaintainingSpeed:
-        return "Keeping your momentum through flat sections requires active weight shifting.${envContext}Compressing and extending your body helps generate the speed needed to make it down the line.";
-      case _CoachingTopic.turningDirection:
-        return "Maneuvering the board starts with looking where you want to go.${envContext}Applying pressure to your rails during your turns helps you carve back toward the power source.";
-      case _CoachingTopic.oceanSkillsSafety:
-        return "Managing ocean conditions safely is essential for a productive session.${envContext}Mastering skills like the duck dive or turtle roll helps you navigate the impact zone with confidence.";
-      case _CoachingTopic.vague:
-        return "It sounds like that session had a lot going on at once. That's normal when you're learning to read the water.";
-    }
-  }
-
-  static String _progressPatternEn({
-    int totalSessions = 0,
-    String? pattern,
-    required _SessionInterpretation interpretation,
-    required _CoachingTopic topic,
-  }) {
-    // Only use generic if topic is truly vague
-    if (topic == _CoachingTopic.vague || interpretation.isVague) {
-      return "Logging sessions like this helps you start noticing small improvements over time.";
-    }
-
-    switch (topic) {
-      case _CoachingTopic.waveSelection:
-        return "You're starting to notice that choosing the right wave is a skill in itself.";
+        return "Next session, you might try keeping your knees a bit more bent to help you stay balanced longer.";
       case _CoachingTopic.lineupAwareness:
-        return "You're starting to read the lineup more and recognize when waves are yours to take.";
-      case _CoachingTopic.paddlingCatchingWaves:
-        return "You're starting to notice how paddle timing affects whether you catch the wave cleanly.";
-      case _CoachingTopic.popUpTakeoffTiming:
-        return "Getting to your feet is becoming more consistent, and now timing your takeoff is the next step.";
-      case _CoachingTopic.balanceStability:
-        return "You're getting onto waves more often, and now you're working on staying steady through the ride.";
+        return "Next time, it could help to notice where other people are sitting to find the best spot for yourself.";
       case _CoachingTopic.generatingMaintainingSpeed:
-        return "You're starting to notice how small weight shifts affect your speed down the line.";
+        return "Next session, you might try shifting your weight a little forward when the wave slows down to keep going.";
       case _CoachingTopic.turningDirection:
-        return "You're beginning to connect your body movement with how the board changes direction.";
+        return "Next time, it could help to look toward where you want to go, and your board will usually follow.";
       case _CoachingTopic.oceanSkillsSafety:
-        return "You're building more comfort in the water, which helps everything else improve.";
+        return "Next session, you could try focusing on your timing when paddling out to make the journey a bit easier.";
       default:
-        return "Logging sessions like this helps you start noticing small improvements over time.";
-    }
-  }
-
-  static String _nextFocusEn({
-    required _SessionInterpretation interpretation,
-    required _CoachingTopic topic,
-  }) {
-    switch (topic) {
-      case _CoachingTopic.waveSelection:
-        return "Next session, focus purely on watching the waves break before paddling for them.";
-      case _CoachingTopic.lineupAwareness:
-        return "Next time out, pay closer attention to where the peak is shifting in the lineup.";
-      case _CoachingTopic.paddlingCatchingWaves:
-        return "Next session, try to start your paddle two strokes earlier to match the wave's speed.";
-      case _CoachingTopic.popUpTakeoffTiming:
-        return "Next time, focus on bringing your feet directly under you in one smooth motion.";
-      case _CoachingTopic.balanceStability:
-        return "Next session, focus on keeping your center of gravity low and your arms steady.";
-      case _CoachingTopic.generatingMaintainingSpeed:
-        return "Next time out, focus on shifting your weight forward to drive through the slow sections.";
-      case _CoachingTopic.turningDirection:
-        return "Next session, try to actively turn your head and shoulders in the direction you want to carve.";
-      case _CoachingTopic.oceanSkillsSafety:
-        return "Next time, focus on your breathing and timing when passing through the impact zone.";
-      case _CoachingTopic.vague:
-        return "Next session, try focusing on one small, specific goal related to your focus skill.";
+        return "Next time, you might try picking one small thing to focus on, like your hand position or where you are looking.";
     }
   }
 
@@ -144,96 +91,53 @@ class AiInsightService {
   // Spanish generators
   // ─────────────────────────────────────────────────────────────────────────
 
-  static String _sessionInsightEs({
-    required _SessionInterpretation interpretation,
-    required _CoachingTopic topic,
-  }) {
-    if (interpretation.isVague) {
-      return "Parece que en esa sesión pasaron muchas cosas a la vez. Eso es normal cuando todavía estás aprendiendo a leer el agua.";
+  static String _workedOnEs({required _SessionInterpretation interpretation}) {
+    final good = interpretation.feltGood.toLowerCase();
+    final hard = interpretation.challenging.toLowerCase();
+    final trying = interpretation.tryingToDo.toLowerCase();
+    
+    if (good.isNotEmpty && hard.isNotEmpty && trying.isNotEmpty) {
+      return "Estuviste $good e intentando $hard en tu $trying.";
+    } else if (good.isNotEmpty && trying.isNotEmpty) {
+      return "Estuviste $good mientras trabajabas en tu $trying.";
+    } else if (trying.isNotEmpty) {
+      return "Te enfocaste en $trying durante tu sesión de hoy.";
     }
-
-    final envContext = interpretation.environmentalContext.isNotEmpty 
-        ? " Dado que las condiciones estaban ${interpretation.environmentalContext}, " 
-        : " ";
-
-    switch (topic) {
-      case _CoachingTopic.waveSelection:
-        return "Mejorar tu selección de olas es la base de una buena sesión.${envContext}Observar las series y elegir olas con más fuerza te posiciona mucho mejor.";
-      case _CoachingTopic.lineupAwareness:
-        return "Navegar el pico de manera efectiva es tan importante como correr la ola.${envContext}Entender la prioridad y encontrar tu sitio te ayuda a agarrar olas sin pelear con la multitud.";
-      case _CoachingTopic.paddlingCatchingWaves:
-        return "Agarrar las olas más temprano requiere velocidad de remada.${envContext}Igualar la energía de la ola con brazadas fuertes y profundas asegura que no te quedes atrás.";
-      case _CoachingTopic.popUpTakeoffTiming:
-        return "Una bajada estable comienza con un pop-up controlado.${envContext}Centrarte en la sincronización de tu despegue evita que claves la punta y te pone de pie antes de que la ola esté muy vertical.";
-      case _CoachingTopic.balanceStability:
-        return "Mantenerte en pie requiere una postura sólida y centrada.${envContext}Centrarte en el equilibrio y mantener las rodillas flexionadas ayuda a absorber los baches para un viaje más estable.";
-      case _CoachingTopic.generatingMaintainingSpeed:
-        return "Mantener tu impulso en las secciones planas requiere cambiar el peso activamente.${envContext}Comprimir y extender tu cuerpo ayuda a generar la velocidad necesaria para seguir la línea.";
-      case _CoachingTopic.turningDirection:
-        return "Maniobrar la tabla comienza mirando hacia donde quieres ir.${envContext}Aplicar presión en los cantos durante los giros te ayuda a volver hacia la zona de poder de la ola.";
-      case _CoachingTopic.oceanSkillsSafety:
-        return "Gestionar las condiciones del océano de forma segura es esencial.${envContext}Dominar habilidades como el pato (duck dive) o la tortuga te ayuda a pasar la zona de impacto con confianza.";
-      case _CoachingTopic.vague:
-        return "Parece que en esa sesión pasaron muchas cosas a la vez. Eso es normal cuando todavía estás aprendiendo a leer el agua.";
-    }
+    return "Pasaste un buen rato practicando en el agua hoy.";
   }
 
-  static String _progressPatternEs({
-    int totalSessions = 0,
-    String? pattern,
-    required _SessionInterpretation interpretation,
-    required _CoachingTopic topic,
-  }) {
-    // Solo usar genérico si el tema es verdaderamente vago
-    if (topic == _CoachingTopic.vague || interpretation.isVague) {
-      return "Anotar sesiones como esta te ayuda a empezar a notar pequeñas mejoras con el tiempo.";
+  static String _whatHappenedEs({required _SessionInterpretation interpretation}) {
+    final good = interpretation.feltGood.toLowerCase();
+    final hard = interpretation.challenging.toLowerCase();
+    
+    if (good.isNotEmpty && hard.isNotEmpty) {
+      return "Parece que $good fue un éxito, pero $hard fue la parte difícil.";
+    } else if (hard.isNotEmpty) {
+      return "Parece que $hard fue un pequeño desafío durante esta sesión.";
     }
+    return "Cada sesión te ayuda a sentirte un poco más cómodo entre las olas.";
+  }
 
-    switch (topic) {
+  static String _tryThisNextEs({required _SessionInterpretation interpretation}) {
+    switch (interpretation.topic) {
       case _CoachingTopic.waveSelection:
-        return "Estás empezando a notar que elegir la ola adecuada es una habilidad en sí misma.";
-      case _CoachingTopic.lineupAwareness:
-        return "Estás empezando a leer el pico de forma más activa y a reconocer cuándo las olas son para ti.";
+        return "La próxima vez, podrías intentar observar las olas desde la orilla unos minutos para ver dónde rompen más seguido.";
       case _CoachingTopic.paddlingCatchingWaves:
-        return "Estás empezando a notar cómo la sincronización de la remada influye en si entras limpiamente en la ola.";
+        return "En la próxima sesión, podría ayudar intentar empezar a remar un poquito antes para agarrar la ola.";
       case _CoachingTopic.popUpTakeoffTiming:
-        return "Ponerte de pie es cada vez más consistente, y ahora sincronizar el despegue es el siguiente paso.";
+        return "La próxima vez, podrías intentar enfocarte en llevar tus pies en un movimiento fluido al sentir el empuje de la ola.";
       case _CoachingTopic.balanceStability:
-        return "Estás entrando en las olas con más frecuencia, y ahora estás trabajando en mantenerte estable durante el recorrido.";
+        return "En la próxima sesión, podrías intentar mantener tus rodillas un poco más flexionadas para ayudarte a mantener el equilibrio más tiempo.";
+      case _CoachingTopic.lineupAwareness:
+        return "La próxima vez, podría ayudar notar dónde está sentada la otra gente para encontrar el mejor lugar para ti.";
       case _CoachingTopic.generatingMaintainingSpeed:
-        return "Estás empezando a notar cómo pequeños cambios de peso afectan tu velocidad en la pared de la ola.";
+        return "En la próxima sesión, podrías intentar mover tu peso un poco hacia adelante cuando la ola pierda fuerza para seguir avanzando.";
       case _CoachingTopic.turningDirection:
-        return "Estás empezando a conectar el movimiento de tu cuerpo con cómo la tabla cambia de dirección.";
+        return "La próxima vez, podría ayudar mirar hacia donde quieres ir, y tu tabla generalmente te seguirá.";
       case _CoachingTopic.oceanSkillsSafety:
-        return "Estás ganando más confianza en el agua, lo que ayuda a que todo lo demás mejore.";
+        return "En la próxima sesión, podrías intentar enfocarte en tu sincronización al entrar al agua para que el trayecto sea un poco más fácil.";
       default:
-        return "Anotar sesiones como esta te ayuda a empezar a notar pequeñas mejoras con el tiempo.";
-    }
-  }
-
-  static String _nextFocusEs({
-    required _SessionInterpretation interpretation,
-    required _CoachingTopic topic,
-  }) {
-    switch (topic) {
-      case _CoachingTopic.waveSelection:
-        return "En la próxima sesión, enfócate puramente en observar cómo rompen las olas antes de remar hacia ellas.";
-      case _CoachingTopic.lineupAwareness:
-        return "La próxima vez, presta más atención a cómo se mueve el pico en el lineup.";
-      case _CoachingTopic.paddlingCatchingWaves:
-        return "En la próxima sesión, intenta empezar a remar dos brazadas antes para igualar la velocidad de la ola.";
-      case _CoachingTopic.popUpTakeoffTiming:
-        return "La próxima vez, enfócate en llevar los pies directamente debajo de ti en un movimiento suave.";
-      case _CoachingTopic.balanceStability:
-        return "En la próxima sesión, enfócate en mantener tu centro de gravedad bajo y los brazos estables.";
-      case _CoachingTopic.generatingMaintainingSpeed:
-        return "La próxima vez, enfócate en echar tu peso hacia adelante para impulsar la tabla en las secciones lentas.";
-      case _CoachingTopic.turningDirection:
-        return "En la próxima sesión, intenta girar activamente la cabeza y los hombros en la dirección a la que quieres ir.";
-      case _CoachingTopic.oceanSkillsSafety:
-        return "La próxima vez, enfócate en tu respiración y sincronización al pasar por la zona de impacto.";
-      case _CoachingTopic.vague:
-        return "En la próxima sesión, intenta centrarte en un objetivo pequeño y específico relacionado con tu habilidad de enfoque.";
+        return "La próxima vez, podrías intentar elegir una cosa pequeña en la cual enfocarte, como la posición de tus manos o hacia dónde miras.";
     }
   }
 
@@ -246,7 +150,7 @@ class AiInsightService {
     final challenging = (session.reflectionWhatWasChallenging ?? '').trim();
     final workingOn = (session.notes).trim(); // notes often used for what working on
     final feltGood = (session.reflectionWhatFeltGood ?? '').trim();
-    final conditions = (session.reflectionConditions ?? '').trim().toLowerCase();
+    final tryingToDo = (session.reflectionConditions ?? '').trim();
     final waves = session.waveSize.trim();
     final board = session.board.trim();
 
@@ -255,15 +159,13 @@ class AiInsightService {
 
     // Environmental context synthesis
     String envContext = "";
-    if (conditions.contains('messy') || conditions.contains('windy') || conditions.contains('choppy')) {
+    if (tryingToDo.toLowerCase().contains('messy') || tryingToDo.toLowerCase().contains('windy') || tryingToDo.toLowerCase().contains('choppy')) {
       envContext = "messy";
-    } else if (conditions.contains('clean') || conditions.contains('glassy')) {
-      envContext = "clean";
     }
 
     final reasoning = "Focus skill is $focus. "
         "Surfer reported '${challenging.isNotEmpty ? challenging : 'no clear challenge'}'. "
-        "Conditions were ${conditions.isNotEmpty ? conditions : 'unknown'}. "
+        "Goal was $tryingToDo. "
         "Coaching angle: prioritize ${topic.name} anchored by Primary Challenge.";
 
     return _SessionInterpretation(
@@ -275,6 +177,7 @@ class AiInsightService {
       challenging: challenging,
       workingOn: workingOn,
       feltGood: feltGood,
+      tryingToDo: tryingToDo,
       waveSize: waves,
       boardType: board,
     );
@@ -410,6 +313,429 @@ class AiInsightService {
     }
     return null;
   }
+
+  /// Rules-based insights for all session levels.
+    static Map<String, String> getRuleBasedInsight({
+    required String struggle,
+    required String waveSize,
+    required String board,
+    List<SessionLogEntry> previousLogs = const [],
+    bool isSpanish = false,
+  }) {
+    final s = struggle.trim().toLowerCase();
+    final repeatCount = s.isNotEmpty
+        ? previousLogs.where((e) => e.sessionFocus.trim().toLowerCase() == s).length
+        : 0;
+    final level = (repeatCount + 1).clamp(1, 5);
+
+    // --- SECONDARY SKILL MAPPING ---
+    final Map<String, String> skillToCoreMapping = {
+      "paddling efficiency": "paddling position",
+      "getting outside": "paddling position",
+      "duck dive (intro)": "paddling position",
+      "turtle roll": "paddling position",
+      "angled takeoff": "pop-up timing",
+      "generating speed": "maintaining speed",
+      "staying with the wave": "maintaining speed",
+      "bottom turn": "stance & balance",
+      "turning on the wave": "stance & balance",
+      "developing bottom turn": "stance & balance",
+      "top turn and cutback": "stance & balance",
+      "carving turns": "stance & balance",
+    };
+
+    if (skillToCoreMapping.containsKey(s)) {
+      final coreTarget = skillToCoreMapping[s]!;
+      final mappedTmplEn = _getInsightTemplates(coreTarget, 1, false);
+      final mappedTmplEs = _getInsightTemplates(coreTarget, 1, true);
+      
+      if (mappedTmplEn != null && mappedTmplEs != null) {
+        return {
+          "summaryEn": "That’s a great area to work on.",
+          "summaryEs": "Es un área fantástica para trabajar.",
+          "patternEn": "It naturally builds on staying balanced and carrying speed.",
+          "patternEs": "Se construye sobre la base del equilibrio y la velocidad.",
+          "nextFocusEn": mappedTmplEn["nextFocus"]!,
+          "nextFocusEs": mappedTmplEs["nextFocus"]!,
+        };
+      }
+    }
+
+    final tmplEn = s.isNotEmpty ? _getInsightTemplates(s, level, false) : null;
+    final tmplEs = s.isNotEmpty ? _getInsightTemplates(s, level, true) : null;
+
+    if (tmplEn != null && tmplEs != null) {
+      return {
+        "summaryEn": tmplEn["summary"]!,
+        "summaryEs": tmplEs["summary"]!,
+        "patternEn": tmplEn["pattern"]!,
+        "patternEs": tmplEs["pattern"]!,
+        "nextFocusEn": tmplEn["nextFocus"]!,
+        "nextFocusEs": tmplEs["nextFocus"]!,
+      };
+    }
+
+    return {
+      "summaryEn": "Great job getting out there today.",
+      "summaryEs": "Gran trabajo metiéndote al agua hoy.",
+      "patternEn": "Consistent water time naturally builds confidence.",
+      "patternEs": "La constancia en el agua te da mucha confianza.",
+      "nextFocusEn": "Next time, you could try focusing on one specific detail, like your paddle rhythm.",
+      "nextFocusEs": "La próxima vez, intenta centrarte en un detalle, como tu ritmo de remada.",
+    };
+
+  }
+
+  static Map<String, String>? _getInsightTemplates(String struggle, int level, bool isSpanish) {
+    final map = {
+      "pop-up timing": {
+        1: {
+          "en": {
+            "summary": "You're getting up just as the wave breaks.",
+            "pattern": "You might feel the board move faster than expected in the critical zone.",
+            "nextFocus": "Next time, you could try popping up right when you feel the initial push.",
+          },
+          "es": {
+            "summary": "Te estás levantando justo cuando la ola rompe.",
+            "pattern": "Podrías sentir que la tabla se mueve más rápido en la zona crítica.",
+            "nextFocus": "La próxima vez, podrías intentar levantarte justo al sentir el primer empuje.",
+          }
+        },
+        2: {
+          "en": {
+            "summary": "Your timing is becoming much more consistent.",
+            "pattern": "Looking at the horizon instead of the board helps your body react naturally.",
+            "nextFocus": "Try keeping your eyes on the beach as you pop up next time.",
+          },
+          "es": {
+            "summary": "Tu sincronización es cada vez más consistente.",
+            "pattern": "Mirar al horizonte en vez de a la tabla ayuda a tu cuerpo a reaccionar mejor.",
+            "nextFocus": "Prueba a mantener la mirada en la orilla mientras te levantas la próxima vez.",
+          }
+        },
+        3: {
+          "en": {
+            "summary": "You're catching waves but might feel a loss of momentum.",
+            "pattern": "Bringing your front foot forward quickly helps keep the board's speed.",
+            "nextFocus": "Next session, you might try landing low to absorb the wave's energy.",
+          },
+          "es": {
+            "summary": "Agarras las olas pero podrías sentir que pierdes impulso.",
+            "pattern": "Llevar el pie delantero rápido ayuda a mantener la velocidad de la tabla.",
+            "nextFocus": "En la próxima sesión, podrías probar aterrizar bajo para absorber la energía.",
+          }
+        },
+        4: {
+          "en": {
+            "summary": "You've been giving your pop-up consistent attention lately.",
+            "pattern": "Swinging your front foot between your hands in one motion snaps everything into place.",
+            "nextFocus": "A small thing to try next time is focusing on a faster arm extension.",
+          },
+          "es": {
+            "summary": "Has estado prestando mucha atención a tu despegue últimamente.",
+            "pattern": "Llevar el pie delantero entre las manos en un solo movimiento lo acomoda todo.",
+            "nextFocus": "Algo pequeño que intentar es enfocarte en una extensión de brazos más rápida.",
+          }
+        },
+        5: {
+          "en": {
+            "summary": "You’ve put solid work into this focus area.",
+            "pattern": "You’ve been coming back to this a lot. Next time, you could try slowing it down slightly to feel the timing more clearly.",
+            "nextFocus": "If it still feels stuck, trying something like wave selection might unlock it.",
+          },
+          "es": {
+            "summary": "Has trabajado mucho en esta área de enfoque.",
+            "pattern": "Has vuelto a esto mucho. La próxima podrías intentar hacerlo más lento para sentir el tiempo mejor.",
+            "nextFocus": "Si te sientes estancado, probar con selección de olas podría desbloquearlo.",
+          }
+        }
+      },
+
+      "paddling position": {
+        1: {
+          "en": {
+            "summary": "You're exploring where you lie on the board.",
+            "pattern": "You might notice the board glides best when the nose is just above the water.",
+            "nextFocus": "Next time, you could try moving an inch forward to see if you catch waves easier.",
+          },
+          "es": {
+            "summary": "Estás explorando tu posición sobre la tabla.",
+            "pattern": "Podrías notar que la tabla desliza mejor con la punta casi rozando el agua.",
+            "nextFocus": "La próxima vez, podrías intentar moverte un poco adelante para entrar mejor.",
+          }
+        },
+        2: {
+          "en": {
+            "summary": "You're finding the exact balance point for your board.",
+            "pattern": "Lifting your chest slightly keeps your weight centered and your breathing easy.",
+            "nextFocus": "Next session, you might experiment with keeping your feet touching.",
+          },
+          "es": {
+            "summary": "Estás encontrando el punto de equilibrio exacto.",
+            "pattern": "Levantar el pecho ayuda a centrar el peso y a respirar mejor al remar.",
+            "nextFocus": "En la próxima sesión, podrías experimentar manteniendo los pies juntos.",
+          }
+        },
+        3: {
+          "en": {
+            "summary": "You're building a strong foundation for board control.",
+            "pattern": "A centered body position lets you use your weight to steer before you stand.",
+            "nextFocus": "Try focusing on deep, long strokes to maximize your glide next time.",
+          },
+          "es": {
+            "summary": "Estás construyendo una base sólida de control.",
+            "pattern": "Un cuerpo centrado permite usar el peso para dirigir antes de pararse.",
+            "nextFocus": "Intenta enfocarte en brazadas largas y profundas para deslizarte más.",
+          }
+        },
+        4: {
+          "en": {
+            "summary": "You've spent several sessions refining your paddling.",
+            "pattern": "Smooth paddling makes the transition to your pop-up feel much more natural.",
+            "nextFocus": "A small thing to try next time is reaching further forward with each stroke.",
+          },
+          "es": {
+            "summary": "Llevas varias sesiones refinando tu remada.",
+            "pattern": "Una remada fluida hace que la transición al despegue sea mucho más natural.",
+            "nextFocus": "Algo pequeño que intentar es alcanzar más adelante con cada brazada.",
+          }
+        },
+        5: {
+          "en": {
+            "summary": "You’ve spent consistent time on your paddling.",
+            "pattern": "You’ve been coming back to this a lot. Next time, you could try slowing it down slightly to feel the timing more clearly.",
+            "nextFocus": "If it still feels stuck, trying something like wave selection might unlock it.",
+          },
+          "es": {
+            "summary": "Le has dedicado mucho tiempo a tu remada.",
+            "pattern": "Has vuelto a esto mucho. La próxima podrías intentar hacerlo más lento para sentir el tiempo mejor.",
+            "nextFocus": "Si te sientes estancado, probar con selección de olas podría desbloquearlo.",
+          }
+        }
+      },
+
+      "stance & balance": {
+        1: {
+          "en": {
+            "summary": "You're exploring how to feel steady during your ride.",
+            "pattern": "You might notice the board is easier to control when you bend at the knees instead of the waist.",
+            "nextFocus": "Next time, you could try keeping your center of gravity low and grounded.",
+          },
+          "es": {
+            "summary": "Estás explorando cómo sentirte estable durante el recorrido.",
+            "pattern": "Podrías notar que la tabla es más fácil de controlar si doblas las rodillas en vez de la cintura.",
+            "nextFocus": "La próxima vez, podrías intentar mantener tu centro de gravedad bajo.",
+          }
+        },
+        2: {
+          "en": {
+            "summary": "You're focusing on keeping the board stable and centered.",
+            "pattern": "A wider stance naturally provides a more secure platform as you ride.",
+            "nextFocus": "Next session, you might experiment with keeping your feet shoulder-width apart.",
+          },
+          "es": {
+            "summary": "Te enfocas en mantener la tabla estable y centrada.",
+            "pattern": "Una postura más ancha da naturalmente una plataforma más segura al surfear.",
+            "nextFocus": "En la próxima sesión, podrías experimentar con los pies al ancho de hombros.",
+          }
+        },
+        3: {
+          "en": {
+            "summary": "You're learning to move naturally with the flow of the wave.",
+            "pattern": "Small weight shifts help you steer without losing your centered balance.",
+            "nextFocus": "Try pointing your front arm where you want to go to help guide your movement.",
+          },
+          "es": {
+            "summary": "Estás aprendiendo a moverte naturalmente con el flujo de la ola.",
+            "pattern": "Pequeños cambios de peso ayudan a dirigir sin perder el equilibrio centrado.",
+            "nextFocus": "Intenta apuntar tu brazo delantero hacia donde quieres ir para guiar el movimiento.",
+          }
+        },
+        4: {
+          "en": {
+            "summary": "You've been practicing your stance consistently lately.",
+            "pattern": "Keeping your upper body relaxed helps the board stay steady under your feet.",
+            "nextFocus": "A small thing to try next time is looking further ahead instead of at the board.",
+          },
+          "es": {
+            "summary": "Has estado practicando tu postura consistentemente últimamente.",
+            "pattern": "Mantener la parte superior relajada ayuda a que la tabla siga estable bajo tus pies.",
+            "nextFocus": "Algo pequeño que intentar es mirar más adelante en vez de a la tabla.",
+          }
+        },
+        5: {
+          "en": {
+            "summary": "You’ve spent consistent time on your balance.",
+            "pattern": "You’ve been coming back to this a lot. Next time, you could try slowing it down slightly to feel the timing more clearly.",
+            "nextFocus": "If it still feels stuck, trying something like maintaining speed might unlock it.",
+          },
+          "es": {
+            "summary": "Has dedicado mucho tiempo a tu equilibrio.",
+            "pattern": "Has vuelto a esto mucho. La próxima podrías intentar hacerlo más lento para sentir el tiempo mejor.",
+            "nextFocus": "Si te sientes estancado, probar con mantener velocidad podría desbloquearlo.",
+          }
+        }
+      },
+
+      "wave selection": {
+        1: {
+          "en": {
+            "summary": "You're learning to spot the best waves for your session.",
+            "pattern": "You might notice that waves with a clear peak break more predictably.",
+            "nextFocus": "Next time, you could try watching the horizon for unbroken bumps.",
+          },
+          "es": {
+            "summary": "Estás aprendiendo a detectar las mejores olas.",
+            "pattern": "Podrías notar que las olas con un pico claro rompen de forma más predecible.",
+            "nextFocus": "La próxima vez, podrías intentar observar montículos sin romper al horizonte.",
+          }
+        },
+        2: {
+          "en": {
+            "summary": "You're focusing on reading how the ocean moves.",
+            "pattern": "Watching how sets build up helps you predict where the next peak will form.",
+            "nextFocus": "Next session, you might experiment with waiting for a wave with more open face.",
+          },
+          "es": {
+            "summary": "Te enfocas en leer cómo se mueve el mar.",
+            "pattern": "Observar cómo crecen las series ayuda a predecir dónde se formará el pico.",
+            "nextFocus": "En la próxima sesión, podrías esperar por una ola con la cara más abierta.",
+          }
+        },
+        3: {
+          "en": {
+            "summary": "You're becoming much better at picking your waves.",
+            "pattern": "Positioning yourself near the initial peak usually provides the longest possible ride.",
+            "nextFocus": "Try paddling slightly closer to where you anticipate the break starting.",
+          },
+          "es": {
+            "summary": "Eres cada vez mejor eligiendo tus olas.",
+            "pattern": "Posicionarse cerca del pico inicial suele dar el recorrido más largo.",
+            "nextFocus": "Intenta remar un poco más cerca de donde preveas que empezará a romper.",
+          }
+        },
+        4: {
+          "en": {
+            "summary": "Wave selection has been a consistent focus for you lately.",
+            "pattern": "Letting a mediocre wave pass often gives you a much better one right behind it.",
+            "nextFocus": "A small thing to try next session is being a bit more patient for the right peak.",
+          },
+          "es": {
+            "summary": "La selección de olas ha sido un enfoque constante últimamente.",
+            "pattern": "Dejar pasar una ola mediocre suele darte una mucho mejor justo detrás.",
+            "nextFocus": "Algo pequeño que probar es tener un poco más de paciencia por el pico ideal.",
+          }
+        },
+        5: {
+          "en": {
+            "summary": "You’ve spent consistent time refining your selection.",
+            "pattern": "You’ve been coming back to this a lot. Next time, you could try slowing it down slightly to feel the timing more clearly.",
+            "nextFocus": "If it still feels stuck, trying something like pop-up timing might unlock it.",
+          },
+          "es": {
+            "summary": "Has dedicado mucho tiempo a refinar tu selección.",
+            "pattern": "Has vuelto a esto mucho. La próxima podrías intentar hacerlo más lento para sentir el tiempo mejor.",
+            "nextFocus": "Si te sientes estancado, probar con pop-up timing podría desbloquearlo.",
+          }
+        }
+      },
+
+      "maintaining speed": {
+        1: {
+          "en": {
+            "summary": "You're focusing on keeping the board moving forward.",
+            "pattern": "You might notice the board glides easier when your weight is shifted slightly toward the nose.",
+            "nextFocus": "Next time, you could try leaning forward when you feel the board slowing down.",
+          },
+          "es": {
+            "summary": "Te enfocas en mantener la tabla moviéndose hacia adelante.",
+            "pattern": "Podrías notar que la tabla desliza mejor si el peso se mueve hacia la punta.",
+            "nextFocus": "La próxima vez, podrías intentar inclinarte adelante si sientes que frenas.",
+          }
+        },
+        2: {
+          "en": {
+            "summary": "You're working on flowing smoothly with the wave.",
+            "pattern": "Staying slightly higher on the wave face usually provides more natural push.",
+            "nextFocus": "Next session, you might try holding a higher line to keep your momentum.",
+          },
+          "es": {
+            "summary": "Estás trabajando en fluir suavemente con la ola.",
+            "pattern": "Mantenerse un poco más alto en la cara suele dar más empuje natural.",
+            "nextFocus": "En la próxima sesión, podrías intentar una línea más alta para no perder inercia.",
+          }
+        },
+        3: {
+          "en": {
+            "summary": "You're learning how to generate your own speed.",
+            "pattern": "Small, active movements through flat sections help you maintain your drive.",
+            "nextFocus": "Try unweighting your knees slightly as you move up the wave face next time.",
+          },
+          "es": {
+            "summary": "Estás aprendiendo a generar tu propia velocidad.",
+            "pattern": "Pequeños movimientos activos en zonas planas ayudan a mantener el impulso.",
+            "nextFocus": "Intenta aligerar las rodillas mientras subes por la pared la próxima vez.",
+          }
+        },
+        4: {
+          "en": {
+            "summary": "You've been giving your speed consistent attention lately.",
+            "pattern": "Looking further down the line naturally pulls your weight forward and builds drive.",
+            "nextFocus": "A small thing to try next time is focusing on the next section before you get there.",
+          },
+          "es": {
+            "summary": "Has prestado mucha atención a tu velocidad últimamente.",
+            "pattern": "Mirar más allá en la pared inclina tu peso adelante y genera impulso.",
+            "nextFocus": "Algo pequeño que intentar es enfocarte en la siguiente sección antes de llegar.",
+          }
+        },
+        5: {
+          "en": {
+            "summary": "You’ve spent consistent time on your momentum.",
+            "pattern": "You’ve been coming back to this a lot. Next time, you could try slowing it down slightly to feel the timing more clearly.",
+            "nextFocus": "If it still feels stuck, trying something like your stance might unlock it.",
+          },
+          "es": {
+            "summary": "Has dedicado mucho tiempo a tu inercia.",
+            "pattern": "Has vuelto a esto mucho. La próxima podrías intentar hacerlo más lento para sentir el tiempo mejor.",
+            "nextFocus": "Si te sientes estancado, probar con tu postura podría desbloquearlo.",
+          }
+        }
+      }
+
+    };
+
+    final category = map.keys.firstWhere((k) => struggle.contains(k), orElse: () => "");
+    if (category.isNotEmpty) {
+        final levelTemplates = map[category]?[level];
+        if (levelTemplates != null) {
+            return isSpanish ? levelTemplates["es"] : levelTemplates["en"];
+        }
+    }
+    
+    if (struggle.contains("pop") || struggle.contains("timing")) {
+      final levelTemplates = map["pop-up timing"]?[level];
+      if (levelTemplates != null) return isSpanish ? levelTemplates["es"] : levelTemplates["en"];
+    }
+    if (struggle.contains("paddle") || struggle.contains("remar")) {
+      final levelTemplates = map["paddling position"]?[level];
+      if (levelTemplates != null) return isSpanish ? levelTemplates["es"] : levelTemplates["en"];
+    }
+    if (struggle.contains("balance") || struggle.contains("equil")) {
+      final levelTemplates = map["stance & balance"]?[level];
+      if (levelTemplates != null) return isSpanish ? levelTemplates["es"] : levelTemplates["en"];
+    }
+    if (struggle.contains("choose") || struggle.contains("selec") || struggle.contains("wave")) {
+      final levelTemplates = map["wave selection"]?[level];
+      if (levelTemplates != null) return isSpanish ? levelTemplates["es"] : levelTemplates["en"];
+    }
+    if (struggle.contains("speed") || struggle.contains("velocidad")) {
+      final levelTemplates = map["maintaining speed"]?[level];
+      if (levelTemplates != null) return isSpanish ? levelTemplates["es"] : levelTemplates["en"];
+    }
+
+    return null;
+  }
 }
 
 class _SessionInterpretation {
@@ -421,6 +747,7 @@ class _SessionInterpretation {
   final String challenging;
   final String workingOn;
   final String feltGood;
+  final String tryingToDo;
   final String waveSize;
   final String boardType;
 
@@ -433,6 +760,7 @@ class _SessionInterpretation {
     required this.challenging,
     required this.workingOn,
     required this.feltGood,
+    required this.tryingToDo,
     required this.waveSize,
     required this.boardType,
   });

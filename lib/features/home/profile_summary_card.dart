@@ -4,12 +4,17 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../../core/permission_service.dart';
 import '../../ui_system/app_card.dart';
 import '../../ui_system/spacing.dart';
 import '../session_log/firebase_service.dart';
 import '../../ui_system/app_theme.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import '../passport/shared_profile_edit_sheet.dart';
+import 'quick_surfer_edit_sheet.dart';
+import 'package:smart_surf/models/surf_dashboard_data.dart';
 
 class ProfileSummaryCard extends StatefulWidget {
   final bool isSpanish;
@@ -33,6 +38,14 @@ class ProfileSummaryCard extends StatefulWidget {
   final bool ageVisibleToCoach;
   final bool ageVisibleOnDashboard;
 
+  // New fields for canonical form
+  final String levelEnTitle;
+  final String levelEnDesc;
+  final String comfortEn;
+  final String boardEn;
+  final List<String> focusEn;
+  final String units;
+
   final Function({
     required String displayName,
     required String? profilePhotoPath,
@@ -52,6 +65,11 @@ class ProfileSummaryCard extends StatefulWidget {
     required bool locationVisibleOnDashboard,
     required bool ageVisibleToCoach,
     required bool ageVisibleOnDashboard,
+    required String levelEnTitle,
+    required String levelEnDesc,
+    required String comfortEn,
+    required String boardEn,
+    required List<String> focusEn,
   }) onUpdate;
 
   const ProfileSummaryCard({
@@ -75,21 +93,28 @@ class ProfileSummaryCard extends StatefulWidget {
     required this.locationVisibleOnDashboard,
     required this.ageVisibleToCoach,
     required this.ageVisibleOnDashboard,
+    required this.levelEnTitle,
+    required this.levelEnDesc,
+    required this.comfortEn,
+    required this.boardEn,
+    required this.focusEn,
+    required this.units,
     required this.onUpdate,
   });
 
   @override
-  State<ProfileSummaryCard> createState() => _ProfileSummaryCardState();
+  State<ProfileSummaryCard> createState() => ProfileSummaryCardState();
 }
 
-class _ProfileSummaryCardState extends State<ProfileSummaryCard> {
+class ProfileSummaryCardState extends State<ProfileSummaryCard> {
   String _t(String en, String es) => widget.isSpanish ? es : en;
 
   String _debugStatus = "Ready";
 
   Future<void> _pickImage() async {
+    // 1. Permission Check
     final picker = ImagePicker();
-    final source = await showModalBottomSheet<ImageSource>(
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
       context: context,
       showDragHandle: true,
       builder: (ctx) => SafeArea(
@@ -111,10 +136,74 @@ class _ProfileSummaryCardState extends State<ProfileSummaryCard> {
       ),
     );
 
-    if (source != null) {
+    if (source == null) return;
+
+    // Explicitly check permissions before invoking picker to prevent iPad crashes
+    final result = await PermissionService().handleImageSourcePermission(source);
+    
+    if (result == PermissionResult.granted || result == PermissionResult.limited) {
+      if (result == PermissionResult.limited && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_t(
+              "Photo library access is limited. You can manage permitted photos in iOS Settings.",
+              "El acceso a la biblioteca está limitado. Puedes gestionar las fotos permitidas en los Ajustes de iOS."
+            )),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      // Proceed to picker
+    } else {
+      if (mounted) {
+        final isCamera = source == ImageSource.camera;
+        String title = isCamera ? _t("Camera Permission", "Permiso de Cámara") : _t("Photos Permission", "Permiso de Fotos");
+        
+        String message = "";
+        if (result == PermissionResult.permanentlyDenied) {
+          message = isCamera
+            ? _t("Camera access is permanently disabled. Please enable it in Settings to take a profile photo.", "El acceso a la cámara está desactivado permanentemente. Por favor, actívalo en Ajustes para tomar una foto.")
+            : _t("Photo library access is permanently disabled. Please enable it in Settings to choose a photo.", "El acceso a la biblioteca está desactivado permanentemente. Por favor, actívalo en Ajustes para elegir una foto.");
+        } else {
+          message = isCamera
+            ? _t("Camera access is required to take a profile photo.", "Se requiere acceso a la cámara para tomar una foto de perfil.")
+            : _t("Photo library access is required to choose a profile photo.", "Se requiere acceso a la biblioteca para elegir una foto de perfil.");
+        }
+
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK")),
+              if (result == PermissionResult.permanentlyDenied)
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    openAppSettings();
+                  },
+                  child: Text(_t("Settings", "Ajustes")),
+                ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    // 2. Interaction
+    try {
       setState(() => _debugStatus = "Picker: Source $source selected.");
       debugPrint("Profile: Picker starting for source: $source");
-      final picked = await picker.pickImage(source: source, maxWidth: 800);
+      
+      final picked = await picker.pickImage(
+        source: source, 
+        maxWidth: 800,
+        imageQuality: 80,
+      );
+
       if (picked != null) {
         setState(() => _debugStatus = "Picker: Image selected (${picked.name}).");
         final bytesCount = kIsWeb ? (await picked.readAsBytes()).length : -1;
@@ -165,6 +254,13 @@ class _ProfileSummaryCardState extends State<ProfileSummaryCard> {
         debugPrint("Profile: Picker dismissed or failed.");
         setState(() => _debugStatus = "Picker: No image selected.");
       }
+    } catch (e) {
+      debugPrint("Profile: Crash safety caught error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_t("Could not open camera/gallery: ", "No se pudo abrir la cámara/galería: ") + e.toString())),
+        );
+      }
     }
   }
 
@@ -187,6 +283,11 @@ class _ProfileSummaryCardState extends State<ProfileSummaryCard> {
     bool? locationVisibleOnDashboard,
     bool? ageVisibleToCoach,
     bool? ageVisibleOnDashboard,
+    String? levelEnTitle,
+    String? levelEnDesc,
+    String? comfortEn,
+    String? boardEn,
+    List<String>? focusEn,
   }) {
     widget.onUpdate(
       displayName: displayName ?? widget.displayName,
@@ -207,37 +308,30 @@ class _ProfileSummaryCardState extends State<ProfileSummaryCard> {
       locationVisibleOnDashboard: locationVisibleOnDashboard ?? widget.locationVisibleOnDashboard,
       ageVisibleToCoach: ageVisibleToCoach ?? widget.ageVisibleToCoach,
       ageVisibleOnDashboard: ageVisibleOnDashboard ?? widget.ageVisibleOnDashboard,
+      levelEnTitle: levelEnTitle ?? widget.levelEnTitle,
+      levelEnDesc: levelEnDesc ?? widget.levelEnDesc,
+      comfortEn: comfortEn ?? widget.comfortEn,
+      boardEn: boardEn ?? widget.boardEn,
+      focusEn: focusEn ?? widget.focusEn,
     );
   }
 
-  void _showEditModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => _ProfileEditSheet(
-        isSpanish: widget.isSpanish,
-        displayName: widget.displayName,
-        stance: widget.stance,
-        height: widget.height,
-        weight: widget.weight,
-        location: widget.location,
-        age: widget.age,
-        surferSummary: widget.surferSummary,
-        stanceVisibleToCoach: widget.stanceVisibleToCoach,
-        stanceVisibleOnDashboard: widget.stanceVisibleOnDashboard,
-        heightVisibleToCoach: widget.heightVisibleToCoach,
-        heightVisibleOnDashboard: widget.heightVisibleOnDashboard,
-        weightVisibleToCoach: widget.weightVisibleToCoach,
-        weightVisibleOnDashboard: widget.weightVisibleOnDashboard,
-        locationVisibleToCoach: widget.locationVisibleToCoach,
-        locationVisibleOnDashboard: widget.locationVisibleOnDashboard,
-        ageVisibleToCoach: widget.ageVisibleToCoach,
-        ageVisibleOnDashboard: widget.ageVisibleOnDashboard,
-        onUpdate: _callUpdate,
-      ),
+  void showQuickEdit() {
+    QuickSurferEditSheet.show(
+      context,
+      isSpanish: widget.isSpanish,
+      displayName: widget.displayName,
+      profilePhotoPath: widget.profilePhotoPath,
+      onUpdate: ({required displayName, required profilePhotoPath}) {
+        _callUpdate(
+          displayName: displayName,
+          profilePhotoPath: profilePhotoPath,
+        );
+      },
     );
   }
+
+
 
   @override
     Widget build(BuildContext context) {
@@ -254,7 +348,7 @@ class _ProfileSummaryCardState extends State<ProfileSummaryCard> {
         : null;
 
     return InkWell(
-      onTap: _showEditModal,
+      onTap: showQuickEdit,
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(16), // AppSpacing.md fallback
@@ -288,7 +382,7 @@ class _ProfileSummaryCardState extends State<ProfileSummaryCard> {
                 right: -4,
                 bottom: -4,
                 child: GestureDetector(
-                  onTap: _pickImage,
+                  onTap: showQuickEdit,
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -317,10 +411,53 @@ class _ProfileSummaryCardState extends State<ProfileSummaryCard> {
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 12,
-                  children: [
-                    if (widget.stanceVisibleOnDashboard && widget.stance.isNotEmpty)
-                      _miniTag(Icons.directions_run_rounded, _t(widget.stance, widget.stance)),
-                  ],
+                  runSpacing: 8,
+                  children: SurfDashboardData(
+                    levelTitle: widget.levelEnTitle,
+                    levelDesc: widget.levelEnDesc,
+                    comfortZone: widget.comfortEn,
+                    board: widget.boardEn,
+                    focusSkills: widget.focusEn,
+                    age: widget.age,
+                    displayName: widget.displayName,
+                    profilePhotoPath: widget.profilePhotoPath,
+                    surferSummary: widget.surferSummary,
+                    stance: widget.stance,
+                    height: widget.height,
+                    weight: widget.weight,
+                    location: widget.location,
+                    stanceVisibleToCoach: widget.stanceVisibleToCoach,
+                    stanceVisibleOnDashboard: widget.stanceVisibleOnDashboard,
+                    heightVisibleToCoach: widget.heightVisibleToCoach,
+                    heightVisibleOnDashboard: widget.heightVisibleOnDashboard,
+                    weightVisibleToCoach: widget.weightVisibleToCoach,
+                    weightVisibleOnDashboard: widget.weightVisibleOnDashboard,
+                    locationVisibleToCoach: widget.locationVisibleToCoach,
+                    locationVisibleOnDashboard: widget.locationVisibleOnDashboard,
+                    ageVisibleToCoach: widget.ageVisibleToCoach,
+                    ageVisibleOnDashboard: widget.ageVisibleOnDashboard,
+                  ).getVisibleProfileFields(widget.isSpanish).map((field) {
+                    IconData icon = Icons.info_outline;
+                    switch (field['label']?.toLowerCase()) {
+                      case 'stance': 
+                      case 'posición':
+                        icon = Icons.directions_run_rounded; break;
+                      case 'location': 
+                      case 'ubicación':
+                      case 'local':
+                        icon = Icons.location_on_outlined; break;
+                      case 'height': 
+                      case 'altura':
+                        icon = Icons.straighten_rounded; break;
+                      case 'weight': 
+                      case 'peso':
+                        icon = Icons.monitor_weight_outlined; break;
+                      case 'age': 
+                      case 'edad':
+                        icon = Icons.cake_outlined; break;
+                    }
+                    return _miniTag(icon, field['value'] ?? '');
+                  }).toList(),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -359,291 +496,4 @@ class _ProfileSummaryCardState extends State<ProfileSummaryCard> {
   }
 }
 
-class _ProfileEditSheet extends StatefulWidget {
-  final bool isSpanish;
-  final String displayName;
-  final String stance;
-  final String height;
-  final String weight;
-  final String location;
-  final bool stanceVisibleToCoach;
-  final bool stanceVisibleOnDashboard;
-  final bool heightVisibleToCoach;
-  final bool heightVisibleOnDashboard;
-  final bool weightVisibleToCoach;
-  final bool weightVisibleOnDashboard;
-  final bool locationVisibleToCoach;
-  final bool locationVisibleOnDashboard;
-  final bool ageVisibleToCoach;
-  final bool ageVisibleOnDashboard;
-  final String age;
-  final String surferSummary;
-  final Function({
-    String? displayName,
-    String? stance,
-    String? height,
-    String? weight,
-    String? location,
-    String? age,
-    String? surferSummary,
-    bool? stanceVisibleToCoach,
-    bool? stanceVisibleOnDashboard,
-    bool? heightVisibleToCoach,
-    bool? heightVisibleOnDashboard,
-    bool? weightVisibleToCoach,
-    bool? weightVisibleOnDashboard,
-    bool? locationVisibleToCoach,
-    bool? locationVisibleOnDashboard,
-    bool? ageVisibleToCoach,
-    bool? ageVisibleOnDashboard,
-  }) onUpdate;
 
-  const _ProfileEditSheet({
-    required this.isSpanish,
-    required this.displayName,
-    required this.stance,
-    required this.height,
-    required this.weight,
-    required this.location,
-    required this.age,
-    required this.surferSummary,
-    required this.stanceVisibleToCoach,
-    required this.stanceVisibleOnDashboard,
-    required this.heightVisibleToCoach,
-    required this.heightVisibleOnDashboard,
-    required this.weightVisibleToCoach,
-    required this.weightVisibleOnDashboard,
-    required this.locationVisibleToCoach,
-    required this.locationVisibleOnDashboard,
-    required this.ageVisibleToCoach,
-    required this.ageVisibleOnDashboard,
-    required this.onUpdate,
-  });
-
-  @override
-  State<_ProfileEditSheet> createState() => _ProfileEditSheetState();
-}
-
-class _ProfileEditSheetState extends State<_ProfileEditSheet> {
-  late TextEditingController nameCtrl;
-  late TextEditingController heightCtrl;
-  late TextEditingController weightCtrl;
-  late TextEditingController locationCtrl;
-  late TextEditingController ageCtrl;
-  late TextEditingController summaryCtrl;
-  late String currentStance;
-  
-  late bool sDash, sCoach, hDash, hCoach, wDash, wCoach, lDash, lCoach, aDash, aCoach;
-
-  @override
-  void initState() {
-    super.initState();
-    nameCtrl = TextEditingController(text: widget.displayName);
-    heightCtrl = TextEditingController(text: widget.height);
-    weightCtrl = TextEditingController(text: widget.weight);
-    locationCtrl = TextEditingController(text: widget.location);
-    ageCtrl = TextEditingController(text: widget.age);
-    summaryCtrl = TextEditingController(text: widget.surferSummary);
-    currentStance = widget.stance;
-    
-    sDash = widget.stanceVisibleOnDashboard;
-    sCoach = widget.stanceVisibleToCoach;
-    hDash = widget.heightVisibleOnDashboard;
-    hCoach = widget.heightVisibleToCoach;
-    wDash = widget.weightVisibleOnDashboard;
-    wCoach = widget.weightVisibleToCoach;
-    lDash = widget.locationVisibleOnDashboard;
-    lCoach = widget.locationVisibleToCoach;
-    aDash = widget.ageVisibleOnDashboard;
-    aCoach = widget.ageVisibleToCoach;
-  }
-
-  String _t(String en, String es) => widget.isSpanish ? es : en;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _t("Edit Profile Summary", "Editar Resumen de Perfil"),
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(
-                labelText: _t("Display Name", "Nombre para mostrar"),
-                border: const OutlineInputBorder(),
-              ),
-              onChanged: (v) => widget.onUpdate(displayName: v),
-            ),
-            const SizedBox(height: 16),
-            
-            _buildFieldGroup(
-              label: _t("Stance", "Posición"),
-              child: SegmentedButton<String>(
-                segments: [
-                  ButtonSegment(value: "Regular", label: Text(_t("Regular", "Regular"))),
-                  ButtonSegment(value: "Goofy", label: Text(_t("Goofy", "Goofy"))),
-                ],
-                selected: {currentStance},
-                onSelectionChanged: (set) {
-                  setState(() => currentStance = set.first);
-                  widget.onUpdate(stance: set.first);
-                },
-              ),
-              dash: sDash,
-              coach: sCoach,
-              onDash: (v) { setState(() => sDash = v); widget.onUpdate(stanceVisibleOnDashboard: v); },
-              onCoach: (v) { setState(() => sCoach = v); widget.onUpdate(stanceVisibleToCoach: v); },
-            ),
-            
-            _buildEditField(
-              label: _t("Height", "Altura"),
-              controller: heightCtrl,
-              dash: hDash,
-              coach: hCoach,
-              onDash: (v) { setState(() => hDash = v); widget.onUpdate(heightVisibleOnDashboard: v); },
-              onCoach: (v) { setState(() => hCoach = v); widget.onUpdate(heightVisibleToCoach: v); },
-              onChanged: (v) => widget.onUpdate(height: v),
-            ),
-            
-            _buildEditField(
-              label: _t("Weight", "Peso"),
-              controller: weightCtrl,
-              dash: wDash,
-              coach: wCoach,
-              onDash: (v) { setState(() => wDash = v); widget.onUpdate(weightVisibleOnDashboard: v); },
-              onCoach: (v) { setState(() => wCoach = v); widget.onUpdate(weightVisibleToCoach: v); },
-              onChanged: (v) => widget.onUpdate(weight: v),
-            ),
-            
-            _buildEditField(
-              label: _t("Location", "Ubicación"),
-              controller: locationCtrl,
-              dash: lDash,
-              coach: lCoach,
-              onDash: (v) { setState(() => lDash = v); widget.onUpdate(locationVisibleOnDashboard: v); },
-              onCoach: (v) { setState(() => lCoach = v); widget.onUpdate(locationVisibleToCoach: v); },
-              onChanged: (v) => widget.onUpdate(location: v),
-            ),
-            
-            _buildEditField(
-              label: _t("Age", "Edad"),
-              controller: ageCtrl,
-              dash: aDash,
-              coach: aCoach,
-              onDash: (v) { setState(() => aDash = v); widget.onUpdate(ageVisibleOnDashboard: v); },
-              onCoach: (v) { setState(() => aCoach = v); widget.onUpdate(ageVisibleToCoach: v); },
-              onChanged: (v) => widget.onUpdate(age: v),
-            ),
-
-            TextField(
-              controller: summaryCtrl,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: _t("Surfer Summary / Coach Description", "Resumen de Surfer / Descripción para Coach"),
-                border: const OutlineInputBorder(),
-              ),
-              onChanged: (v) => widget.onUpdate(surferSummary: v),
-            ),
-            
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: FilledButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(_t("Done", "Listo")),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFieldGroup({required String label, required Widget child, required bool dash, required bool coach, required ValueChanged<bool> onDash, required ValueChanged<bool> onCoach}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        const SizedBox(height: 8),
-        child,
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            _toggleItem(Icons.dashboard_outlined, _t("On Dash", "En Dash"), dash, onDash),
-            const SizedBox(width: 12),
-            _toggleItem(Icons.badge_outlined, _t("To Coach", "Para Coach"), coach, onCoach),
-          ],
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _buildEditField({required String label, required TextEditingController controller, required bool dash, required bool coach, required ValueChanged<bool> onDash, required ValueChanged<bool> onCoach, required ValueChanged<String> onChanged}) {
-    return Column(
-      children: [
-        TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            labelText: label,
-            border: const OutlineInputBorder(),
-          ),
-          onChanged: onChanged,
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            _toggleItem(Icons.dashboard_outlined, _t("On Dash", "En Dash"), dash, onDash),
-            const SizedBox(width: 12),
-            _toggleItem(Icons.badge_outlined, _t("To Coach", "Para Coach"), coach, onCoach),
-          ],
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _toggleItem(IconData icon, String label, bool value, ValueChanged<bool> onChanged) {
-    return InkWell(
-      onTap: () => onChanged(!value),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: value ? AppTheme.primary : AppTheme.textMuted),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                color: value ? AppTheme.primary : AppTheme.textMuted,
-                fontWeight: value ? FontWeight.w800 : FontWeight.w500,
-              ),
-            ),
-            const SizedBox(width: 4),
-            SizedBox(
-              height: 14,
-              width: 14,
-              child: Checkbox(
-                value: value,
-                onChanged: (v) => onChanged(v ?? false),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

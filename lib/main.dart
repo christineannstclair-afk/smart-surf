@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -25,11 +26,14 @@ import 'storage/app_storage.dart';
 import 'models/surf_dashboard_data.dart';
 import 'models/reflection_model.dart';
 import 'models/ai_analysis_model.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
+import 'core/subscription_config.dart';
+import 'features/surfer_pro/surfer_pro_paywall.dart';
 import 'features/surfer_pro/surfer_pro_screen.dart';
 import 'features/session_log/firebase_service.dart';
-import 'features/surfer_pro/surfer_pro_paywall.dart';
 
 import 'core/translation_service.dart';
+import 'core/analyze_api.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,16 +54,20 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
   bool _showSplash = true;
   bool _showOnboarding = true;
   bool _enteredThisSession = false;
-  bool _quickStartShown = false;
+  bool _showReturnNudge = false;
   int _index = 0;
 
   final GlobalKey _progressKey = GlobalKey();
-  final GlobalKey _addSessionKey = GlobalKey();
+  final GlobalKey<SessionLogScreenState> _addSessionKey = GlobalKey<SessionLogScreenState>();
+  final GlobalKey<SurfPassportScreenState> _passportKey = GlobalKey<SurfPassportScreenState>();
   final GlobalKey _mapKey = GlobalKey();
-  final GlobalKey _homeKey = GlobalKey();
+  final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<ScaffoldMessengerState> _messengerKey = GlobalKey<ScaffoldMessengerState>();
   OverlayEntry? _tourOverlay;
 
   final SubscriptionService _subService = SubscriptionService();
+  StreamSubscription<User?>? _authSubscription;
   AppSettings _settings = const AppSettings(isSpanish: false, isCoachPro: false, isSurferPro: false, isSurferTrial: false);
 
   final List<SessionReflection> _reflections = [];
@@ -67,6 +75,13 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
   final List<SessionLogEntry> _sessionLogs = [];
 
   bool get _isSpanish => _settings.isSpanish;
+
+  void _triggerAddSession() {
+    setState(() => _index = 2); // Switch to Log tab
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _addSessionKey.currentState?.openAddSessionSheet();
+    });
+  }
 
   void _updateSettings(AppSettings newSettings) {
     setState(() => _settings = newSettings);
@@ -80,17 +95,33 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
 
 
   void _resetOnboarding() {
-    setState(() => _quickStartShown = false);
+    setState(() {
+      _levelEnTitle = "";
+      _levelEnDesc = "";
+      _comfortEn = "";
+      _boardEn = "";
+      _focusEn = [];
+      _stance = "";
+      _displayName = "";
+      _profilePhotoPath = null;
+      _height = "";
+      _weight = "";
+      _location = "";
+      _age = "";
+      _surferSummary = "";
+    });
     AppStorage.clearTourFlags();
     _updateSettings(_settings.copyWith(
       hasEnteredApp: false, 
       hasSeenOnboarding: false, 
       hasSeenGuidedTour: false, 
-      seenDashboardPrompt: false,
-      seenLogPrompt: false,
       seenPassportPrompt: false,
+      hasSeenDashboardGuidance: false,
+      hasSeenPassportGuidance: false,
+      hasSeenProfileNudge: false,
       hasSeenMapTip: false,
       hasSeenSettingsTip: false,
+      hasSeenWelcomeGuide: false,
       appVersion: '1.0.1'
     ));
     if (mounted && context.mounted) {
@@ -103,17 +134,44 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
     }
   }
 
-  void _unlockSurferPro() {
-    _updateSettings(_settings.copyWith(isSurferPro: true));
-    if (_navigatorKey.currentContext != null) {
-      ScaffoldMessenger.of(_navigatorKey.currentContext!).showSnackBar(
-        SnackBar(
-          content: Text(_isSpanish ? '¡Surfer Pro desbloqueado!' : 'Surfer Pro Unlocked!'),
-          backgroundColor: AppTheme.primary,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+  void _initPurchaseListener() {
+    Purchases.addCustomerInfoUpdateListener((customerInfo) {
+      debugPrint('[Purchases] CustomerInfo updated. checking entitlements...');
+      final isCoachPro = customerInfo.entitlements.all[SubscriptionConfig.entitlementCoachPro]?.isActive ?? false;
+      final isSurferPro = customerInfo.entitlements.all[SubscriptionConfig.entitlementSurferPro]?.isActive ?? false;
+      
+      if (_settings.isCoachPro != isCoachPro || _settings.isSurferPro != isSurferPro) {
+        debugPrint('[Purchases] Entitlement state changed! Coach: $isCoachPro, Surfer: $isSurferPro');
+        _updateSettings(_settings.copyWith(
+          isCoachPro: isCoachPro,
+          isSurferPro: isSurferPro,
+        ));
+      }
+    });
+  }
+
+  void _initAuthListener() {
+    _authSubscription?.cancel();
+    _authSubscription = FirebaseAuth.instance.userChanges().listen((user) async {
+      debugPrint('[AuthSync] User changed: ${user?.uid}');
+      if (user != null) {
+        await _subService.logIn(user.uid);
+      } else {
+        await _subService.logOut();
+      }
+      
+      // After identity switch, refresh entitlements
+      final coachActive = await _subService.isCoachProActive();
+      final surferActive = await _subService.isSurferProActive();
+      
+      if (_settings.isCoachPro != coachActive || _settings.isSurferPro != surferActive) {
+        debugPrint('[AuthSync] Entitlements changed after identity switch. Refreshing UI.');
+        _updateSettings(_settings.copyWith(
+          isCoachPro: coachActive,
+          isSurferPro: surferActive,
+        ));
+      }
+    });
   }
 
 // Canonical values stored in EN
@@ -122,7 +180,7 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
   String _comfortEn = "";
   String _boardEn = "";
   List<String> _focusEn = const [];
-  String _stance = "Regular";
+  String _stance = "";
   String _displayName = "";
   String? _profilePhotoPath;
   String _height = "";
@@ -183,6 +241,8 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
     final s = _latestLoggedSession;
     return s?.mediaType;
   }
+
+  String _t(String en, String es) => _isSpanish ? es : en;
 
   void _updateProfile({
     required String levelEnTitle,
@@ -326,15 +386,18 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       } else {
         _sessionLogs.insert(0, entry);
       }
-      
-      // Sync focus skills to passport ONLY if completed
-      if (entry.isCompleted && entry.sessionFocus.isNotEmpty) {
-        final List<String> currentFocus = List.from(_focusEn);
-        if (!currentFocus.contains(entry.sessionFocus)) {
-          // Keep most recent 4
-          _focusEn = [entry.sessionFocus, ...currentFocus].take(4).toList();
-        }
+
+      if (showBanner) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isSpanish ? "Sesión registrada" : "Session logged"),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
+      
+
 
       // Objective 4: Auto-Add Logged Surf Spot to Map
       if (entry.isCompleted && entry.spotName.isNotEmpty && entry.spotName != (_isSpanish ? "Sesión Actual" : "Current Session")) {
@@ -383,6 +446,9 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       email: FirebaseAuth.instance.currentUser?.email,
     ));
     
+    // Objective 4.2: Aggressively sync to Firestore
+    FirebaseService().saveSessionToFirestore(entry);
+    
     // Sync to Firestore
     FirebaseService().saveFullProfile(SurfDashboardData(
       levelTitle: _levelEnTitle,
@@ -412,67 +478,173 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       ageVisibleOnDashboard: _ageVisibleOnDashboard,
       email: FirebaseAuth.instance.currentUser?.email,
     ));
+  }
 
-    if (showBanner && _navigatorKey.currentState != null) {
-      final navContext = _navigatorKey.currentState!.context;
-      SessionLoggedBanner.show(
-        navContext,
-        isSpanish: _isSpanish,
-        onViewPassport: () => setState(() => _index = 1),
+  Future<SessionLogEntry?> _unlockFirstInsight() async {
+    if (_sessionLogs.length < 3) return null;
+    
+    // Most recent completed session
+    final lastSession = _sessionLogs.firstWhere((e) => e.isCompleted, orElse: () => _sessionLogs.first);
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (idToken == null) return null;
+
+    try {
+      final result = await AnalyzeApi.analyzeReflection(
+        idToken: idToken,
+        sessionId: lastSession.id,
+        focus: lastSession.sessionFocus,
+        workedOn: lastSession.sessionFocus,
+        feltHard: lastSession.reflectionWhatWasChallenging ?? "",
+        feltGood: lastSession.reflectionWhatFeltGood ?? "",
+        conditions: lastSession.reflectionConditions ?? "",
+        notes: lastSession.notes,
+        language: _isSpanish ? "es" : "en",
       );
 
-      // Show Surfer Pro upgrade prompt if not already pro
-      if (!_settings.isSurferPro) {
-        Future.delayed(const Duration(milliseconds: 1500), () {
-          if (_navigatorKey.currentState != null) {
-            _showSurferProUpgradePrompt(_navigatorKey.currentState!.context);
-          }
-        });
+      final updatedSession = lastSession.copyWith(
+        aiSummaryEn: result['session_insight_en'],
+        aiSummaryEs: result['session_insight_es'],
+        aiProgressPatternEn: result['progress_pattern_en'],
+        aiProgressPatternEs: result['progress_pattern_es'],
+        aiNextFocusEn: result['next_session_focus_en'],
+        aiNextFocusEs: result['next_session_focus_es'],
+      );
+      
+      _addSession(updatedSession);
+      return updatedSession;
+
+    } catch (e) {
+      debugPrint("Error unlocking first insight: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isSpanish ? "Error al desbloquear insight" : "Error unlocking insight")),
+        );
       }
+      return null;
     }
   }
 
-  void _showSurferProUpgradePrompt(BuildContext context) {
+  Future<SessionLogEntry?> _generateInsight(SessionLogEntry session) async {
+    debugPrint("🤖 AI Insight: Request started for session ${session.id}");
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (idToken == null) {
+      debugPrint("🤖 AI Insight: Error - No ID token available");
+      return null;
+    }
+
+    try {
+      debugPrint("🤖 AI Insight: Calling AnalyzeApi.analyzeReflection with waveSize: ${session.waveSize}, board: ${session.board}...");
+      final result = await AnalyzeApi.analyzeReflection(
+        idToken: idToken,
+        sessionId: session.id,
+        focus: session.sessionFocus,
+        workedOn: session.sessionFocus,
+        feltHard: session.reflectionWhatWasChallenging ?? "",
+        feltGood: session.reflectionWhatFeltGood ?? "",
+        conditions: session.reflectionConditions ?? "",
+        notes: session.notes,
+        language: _isSpanish ? "es" : "en",
+        waveHeight: session.waveSize,
+        board: session.board,
+      );
+
+      debugPrint("🤖 AI Insight: API Response received: $result");
+
+      final updatedSession = session.copyWith(
+        aiSummaryEn: result['session_insight_en'],
+        aiSummaryEs: result['session_insight_es'],
+        aiProgressPatternEn: result['progress_pattern_en'],
+        aiProgressPatternEs: result['progress_pattern_es'],
+        aiNextFocusEn: result['next_session_focus_en'],
+        aiNextFocusEs: result['next_session_focus_es'],
+        aiFocusTagEn: result['focus_tag_en'],
+        aiFocusTagEs: result['focus_tag_es'],
+      );
+      
+      debugPrint("🤖 AI Insight: Parsed fields - Summary: ${updatedSession.aiSummaryEn ?? updatedSession.aiSummaryEs}, Next Focus: ${updatedSession.aiNextFocusEn ?? updatedSession.aiNextFocusEs}");
+
+      debugPrint("🤖 AI Insight: Persisting to Firestore/Storage...");
+      _addSession(updatedSession);
+
+      if (!_settings.hasUsedFirstFreeAIInsight) {
+        _updateSettings(_settings.copyWith(hasUsedFirstFreeAIInsight: true));
+      }
+
+      debugPrint("🤖 AI Insight: Persist complete.");
+      
+      return updatedSession;
+
+    } catch (e) {
+      debugPrint("🤖 AI Insight: Error caught in _generateInsight: $e");
+      return null;
+    }
+  }
+
+
+  void _showSurferProUpgradePrompt(BuildContext context, {
+    String? title, 
+    String? content, 
+    bool isSoftUpsell = false,
+    VoidCallback? onSeeThisOneFirst,
+  }) {
+    if (isSoftUpsell && _settings.surferProPopupSuppressedUntil > _sessionLogs.length) {
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(_isSpanish ? 'Insight de Surf' : 'Surf Insight'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(_isSpanish 
-              ? 'Desbloquea insights de surf más profundos de tu sesión.' 
-              : 'Unlock deeper surf insights from your session.'),
-            const SizedBox(height: 16),
-            _BenefitItem(
-              icon: Icons.auto_awesome, 
-              text: _isSpanish ? 'Insights de sesión con IA' : 'AI session insights', 
-              isSpanish: _isSpanish
-            ),
-            _BenefitItem(
-              icon: Icons.trending_up, 
-              text: _isSpanish ? 'Patrones de progreso entre surfeos' : 'Progress patterns across surfs', 
-              isSpanish: _isSpanish
-            ),
-            _BenefitItem(
-              icon: Icons.tips_and_updates, 
-              text: _isSpanish ? 'Sugerencias de enfoque para tu próxima sesión' : 'Next session focus suggestions', 
-              isSpanish: _isSpanish
-            ),
-          ],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text(
+          title ?? (_isSpanish ? '¿Quieres ayuda para entender tus sesiones?' : 'want help figuring out your sessions?'),
+          style: const TextStyle(fontWeight: FontWeight.w900),
         ),
+        content: Text(content ?? (_isSpanish 
+          ? 'Obtén insights sencillos después de cada surf para que sepas exactamente en qué enfocarte después.' 
+          : 'get simple insights after each surf so you know what to focus on next')),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(_isSpanish ? 'Omitir por ahora' : 'Skip for now'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _showSurferPro();
-            },
-            child: Text(_isSpanish ? 'Probar Surfer Pro' : 'Try Surfer Pro'),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showSurferPro();
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(_isSpanish ? 'empezar prueba gratis de 3 días' : 'start free 3-day trial'),
+                ),
+              ),
+              if (onSeeThisOneFirst != null)
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      onSeeThisOneFirst();
+                    },
+                    child: Text(_isSpanish ? 'ver este primero' : 'see this one first'),
+                  ),
+                ),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _updateSettings(_settings.copyWith(
+                      surferProPopupSuppressedUntil: _sessionLogs.length + 2,
+                    ));
+                  },
+                  child: Text(_isSpanish ? 'seguir explorando' : 'keep exploring', style: const TextStyle(color: Colors.grey)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -488,6 +660,7 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
   void _deleteSession(String id) {
     setState(() => _sessionLogs.removeWhere((e) => e.id == id));
     AppStorage.saveSessions(_sessionLogs);
+    FirebaseService().deleteSessionFromFirestore(id);
   }
 
   Future<void> _performFullReset() async {
@@ -507,7 +680,38 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       _index = 0;
       _showOnboarding = true;
       _enteredThisSession = false;
-      _quickStartShown = false;
+      _location = "";
+      _age = "";
+      _stance = "";
+      _height = "";
+      _weight = "";
+      _surferSummary = "";
+      
+      // Ensure specific onboarding flags are reset for reliable testing
+      _settings = _settings.copyWith(
+        hasSeenOnboarding: false,
+        seenDashboardPrompt: false,
+        seenLogPrompt: false,
+        seenPassportPrompt: false,
+        hasEnteredApp: false,
+        hasSeenWelcomeGuide: false,
+        hasSeenGuidedTour: false,
+        hasSeenFirstInsightPrompt: false,
+        hasUsedFirstFreeAIInsight: false,
+        hasSeenAIRepeatNudge: false,
+        hasSeenMapTip: false,
+        hasSeenSettingsTip: false,
+        hasSeenDashboardGuidance: false,
+        hasSeenPassportGuidance: false,
+        hasSeenProfileNudge: false,
+        hasSeenDashboardGuide: false,
+        hasSeenLogGuide: false,
+        hasSeenPassportGuide: false,
+        hasSeenReturnNudge: false,
+        hasSeenLogPulse: false,
+        hasSeenPostFirstSessionPassportPrompt: false,
+        hasSeenPostPassportProfilePrompt: false,
+      );
     });
 
     // 2. Clear persistent storage
@@ -541,7 +745,7 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      _messengerKey.currentState?.showSnackBar(
         SnackBar(
           content: Text(_isSpanish ? 'Datos restablecidos por completo' : 'App data fully reset'),
           behavior: SnackBarBehavior.floating,
@@ -563,9 +767,8 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
     AppStorage.saveReflections(_reflections);
   }
 
-  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-
-  void _showSurferPro() {
+  void _showSurferPro({String? title, String? content}) {
+    if (_sessionLogs.length < 3) return; // Beginner Flow Gating
     FirebaseService().logEvent('surfer_pro_opened');
     if (_navigatorKey.currentContext != null) {
       if (_settings.isSurferPro) {
@@ -578,11 +781,12 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
           aiAnalyses: _aiAnalyses,
           onAddAiAnalysis: _addAiAnalysis,
         );
+      } else if (title != null || content != null) {
+        _showSurferProUpgradePrompt(_navigatorKey.currentContext!, title: title, content: content);
       } else {
         showSurfInsightPaywall(
           _navigatorKey.currentContext!,
           isSpanish: _isSpanish,
-          onUnlock: _unlockSurferPro,
         );
       }
     }
@@ -596,15 +800,43 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
   @override
   void initState() {
     super.initState();
+    _initPurchaseListener();
+    _initAuthListener();
     _boot();
   }
 
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> _boot() async {
-    // 0. Handle Web Reset Parameter
-    await _subService.init();
-    final isCoachPro = await _subService.isCoachProActive();
-    final isSurferPro = await _subService.isSurferProActive();
-    final isSurferTrial = await _subService.isSurferTrialActive();
+    // 0. Initialize Subscription Service
+    debugPrint('[AppBoot] Verifying entitlements on launch...');
+    bool isCoachPro = false;
+    bool isSurferPro = false;
+    bool isSurferTrial = false;
+
+    try {
+      await _subService.init();
+      
+      // Ensure current user is logged into RevenueCat at boot
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        debugPrint('[AppBoot] Syncing identity for already logged in user: ${currentUser.uid}');
+        await _subService.logIn(currentUser.uid);
+      }
+      
+      isCoachPro = await _subService.isCoachProActive();
+      isSurferPro = await _subService.isSurferProActive();
+      isSurferTrial = await _subService.isSurferTrialActive();
+      
+      debugPrint('[AppBoot] Verification complete. Coach: $isCoachPro, Surfer: $isSurferPro');
+    } catch (e) {
+      debugPrint('[AppBoot] Error during verification: $e');
+      // On error, we remain with default 'false' values (fail-safe)
+    }
 
     // 1. Initialize Firebase & Auth centrally
 
@@ -612,13 +844,27 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
     final rawData = await AppStorage.loadAll();
     final data = await FirebaseService().hydrateLocalsFromFirestore(rawData);
 
+    // Calculate return nudge
+    bool showReturnNudge = false;
+    if (data.settings.lastLoginDate != null) {
+      final lastLogin = DateTime.tryParse(data.settings.lastLoginDate!);
+      if (lastLogin != null) {
+        final diff = DateTime.now().difference(lastLogin).inDays;
+        if (diff >= 3 && !data.settings.hasSeenReturnNudge) {
+          showReturnNudge = true;
+        }
+      }
+    }
+
     if (!mounted) return;
     setState(() {
       _settings = data.settings.copyWith(
         isCoachPro: isCoachPro,
         isSurferPro: isSurferPro,
         isSurferTrial: isSurferTrial,
+        lastLoginDate: DateTime.now().toIso8601String(),
       );
+      _showReturnNudge = showReturnNudge;
       final user = FirebaseAuth.instance.currentUser;
       _showOnboarding = user == null || !_settings.hasSeenOnboarding;
       _isBooting = false;
@@ -667,68 +913,13 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
     });
   }
 
-  Future<void> _showQuickStart(BuildContext context) async {
-    if (_quickStartShown) return;
-    if (!_settings.showQuickStartOnLaunch) return;
-
-    _quickStartShown = true;
-
-    await showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                _isSpanish ? "¿Qué quieres hacer hoy?" : "What do you want to do today?",
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              _QuickActionTile(
-                icon: Icons.trending_up,
-                label: _isSpanish ? "Actualiza tu Perfil" : "Update your Surf Dashboard",
-                onTap: () {
-                  Navigator.pop(ctx);
-                  setState(() => _index = 0);
-                },
-              ),
-              _QuickActionTile(
-                icon: Icons.badge,
-                label: _isSpanish ? "Muestra tu Pasaporte" : "Show your Surf Passport",
-                onTap: () {
-                  Navigator.pop(ctx);
-                  setState(() => _index = 1);
-                },
-              ),
-              _QuickActionTile(
-                icon: Icons.playlist_add,
-                label: _isSpanish ? "Registra una sesión" : "Log a session",
-                onTap: () {
-                  Navigator.pop(ctx);
-                  setState(() => _index = 2);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    // After QuickStart is dismissed, we are done
-  }
-
 
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: _navigatorKey,
+      scaffoldMessengerKey: _messengerKey,
       debugShowCheckedModeBanner: false,
       title: 'Smart Surf',
       theme: AppTheme.themeData,
@@ -737,6 +928,11 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
   }
 
   Widget _buildHome() {
+    debugPrint('--- BUILD HOME DEBUG ---');
+    debugPrint('Current Index: $_index');
+    debugPrint('Show Onboarding: $_showOnboarding');
+    debugPrint('hasSeenWelcomeGuide: ${_settings.hasSeenWelcomeGuide}');
+
     if (_showSplash) {
       return SplashScreen(onFinish: () {
         setState(() => _showSplash = false);
@@ -797,7 +993,14 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
           setState(() {
             _showOnboarding = false;
             _enteredThisSession = true;
-            _index = 0;
+            // First-Time User Logic: Redirect to Session Log instead of Dashboard
+            if (_sessionLogs.isEmpty) {
+              debugPrint('First time user: Setting index to 2 (Log Screen)');
+              _index = 2;
+            } else {
+              debugPrint('Returning user: Setting index to 0 (Dashboard)');
+              _index = 0;
+            }
           });
 
           // Aggressively sync the profile to Firestore now that we are logged in
@@ -845,7 +1048,7 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         isSurferPro: _settings.isSurferPro,
         isSurferTrial: _settings.isSurferTrial,
         onSetLanguage: _setLanguage,
-        onUnlockSurferPro: _unlockSurferPro,
+        onUnlockSurferPro: () {}, // Handled by listener
         levelEnTitle: _levelEnTitle,
         levelEnDesc: _levelEnDesc,
         comfortEn: _comfortEn,
@@ -875,19 +1078,45 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         ageVisibleOnDashboard: _ageVisibleOnDashboard,
         units: _settings.units,
         onUpdate: _updateProfile,
-        onOpenPassportTab: () => setState(() => _index = 1),
-        onOpenLogTab: () => setState(() => _index = 2),
+        onOpenPassportTab: ({bool edit = false}) {
+          if (edit) {
+            // Open the edit profile sheet directly from Home if requested
+            _homeKey.currentState?.showProfileInfoEdit();
+          } else {
+            setState(() => _index = 1);
+          }
+        },
+        onOpenLogTab: _triggerAddSession,
         onOpenSurferPro: _showSurferPro,
         logs: _sessionLogs,
+        aiAnalyses: _aiAnalyses,
+        onUnlockFirstInsight: _unlockFirstInsight,
         progressKey: _progressKey,
         onOpenLogTab2: () => setState(() => _index = 2),
         onOpenMapTab: () => setState(() => _index = 3),
         onPromptDismissed: () => _updateSettings(_settings.copyWith(seenDashboardPrompt: true)),
         seenDashboardPrompt: _settings.seenDashboardPrompt,
+        hasSeenDashboardGuidance: _settings.hasSeenDashboardGuidance,
+        onGuidanceDismissed: (type) {
+          if (type == "dashboard") {
+            _updateSettings(_settings.copyWith(hasSeenDashboardGuidance: true));
+          }
+        },
+        hasSeenWelcomeGuide: _settings.hasSeenWelcomeGuide,
+        onWelcomeModalDismissed: () => _updateSettings(_settings.copyWith(hasSeenWelcomeGuide: true)),
+        showReturnNudge: _showReturnNudge,
+        onReturnNudgeDismissed: () {
+          setState(() => _showReturnNudge = false);
+          _updateSettings(_settings.copyWith(hasSeenReturnNudge: true));
+        },
+        hasSeenLogPulse: _settings.hasSeenLogPulse,
+        onLogPulseShown: () => _updateSettings(_settings.copyWith(hasSeenLogPulse: true)),
+        hasUsedFirstFreeAIInsight: _settings.hasUsedFirstFreeAIInsight,
       ),
 
 // 1 = Surf Passport
       SurfPassportScreen(
+        key: _passportKey,
         isSpanish: _isSpanish,
         levelEnTitle: _levelEnTitle,
         levelEnDesc: _levelEnDesc,
@@ -921,29 +1150,117 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         onUpdate: _updateProfile,
         onPromptDismissed: () => _updateSettings(_settings.copyWith(seenPassportPrompt: true)),
         seenPassportPrompt: _settings.seenPassportPrompt,
+        hasSeenPassportGuidance: _settings.hasSeenPassportGuidance,
+        onGuidanceDismissed: (type) {
+          if (type == "passport") {
+            _updateSettings(_settings.copyWith(hasSeenPassportGuidance: true));
+          }
+        },
         logs: _sessionLogs,
         onReturnToDashboard: _onReturnToDashboard,
       ),
 
 // 2 = Session Logs
       SessionLogScreen(
+        key: _addSessionKey,
         isSpanish: _isSpanish,
         isSurferPro: _settings.isSurferPro,
+        focusEn: _focusEn,
         onSetLanguage: _setLanguage,
         displayName: _displayName,
         logs: _sessionLogs,
-        aiAnalyses: _aiAnalyses,
-        onAdd: (e) => _addSession(e, showBanner: true),
-        onUpdate: _addSession,
+        onAdd: _addSession,
         onDelete: _deleteSession,
+        onUpdate: _addSession,
+        onUpdateProfile: _updateProfile,
+        onUnlockFirstInsight: _unlockFirstInsight,
+        onGenerateInsight: (session) async {
+          // Trigger 3: After 5 total sessions logged
+          if (!_settings.isSurferPro && _sessionLogs.length >= 5 && _settings.surferProPopupSuppressedUntil <= _sessionLogs.length) {
+             _showSurferProUpgradePrompt(
+               context,
+               title: _isSpanish ? '¿Estás disfrutando Smart Surf?' : 'enjoying smart surf?',
+               content: _isSpanish 
+                  ? 'Lleva tu progreso al siguiente nivel con insights de IA después de cada sesión.' 
+                  : 'take your progress to the next level with ai insights after every session.',
+               isSoftUpsell: true,
+             );
+             return null;
+          }
+          return await _generateInsight(session);
+        },
+        onInsightViewed: () {
+          if (!_settings.isSurferPro) {
+            final newCount = _settings.insightsViewedCount + 1;
+            _updateSettings(_settings.copyWith(insightsViewedCount: newCount));
+            
+            // Trigger 2: After 3 insights viewed
+            if (newCount >= 3 && _settings.surferProPopupSuppressedUntil <= _sessionLogs.length) {
+               _showSurferProUpgradePrompt(
+                 context,
+                 title: _isSpanish ? '¿Te ayudan estos insights?' : 'finding these insights helpful?',
+                 content: _isSpanish 
+                    ? 'Obtén feedback personalizado después de cada surf con Surfer Pro.' 
+                    : 'get personalized feedback after every single surf with surfer pro.',
+                 isSoftUpsell: true,
+               );
+            }
+          }
+        },
+        onOpenSurferPro: ({title, content, isSoftUpsell = false, onSeeThisOneFirst}) {
+          _showSurferProUpgradePrompt(
+            context, 
+            title: title, 
+            content: content, 
+            isSoftUpsell: isSoftUpsell,
+            onSeeThisOneFirst: onSeeThisOneFirst,
+          );
+        },
+        onKeepExploring: () {
+          _updateSettings(_settings.copyWith(
+            surferProPopupSuppressedUntil: _sessionLogs.length + 2,
+            hasSeenFirstInsightPrompt: true,
+          ));
+        },
         units: _settings.units,
+        aiAnalyses: _aiAnalyses,
         addSessionKey: _addSessionKey,
-        onPromptDismissed: () => _updateSettings(_settings.copyWith(seenLogPrompt: true)),
         seenLogPrompt: _settings.seenLogPrompt,
-        onUnlockSurferPro: _unlockSurferPro,
+        onPromptDismissed: () => _updateSettings(_settings.copyWith(seenLogPrompt: true)),
         sessionsThisMonth: _sessionsThisMonth,
         currentStreak: _currentStreak,
-        onReturnToDashboard: _onReturnToDashboard,
+        onReturnToDashboard: () => setState(() => _index = 0),
+        hasSeenWelcomeGuide: _settings.hasSeenWelcomeGuide,
+        onWelcomeModalDismissed: () => _updateSettings(_settings.copyWith(hasSeenWelcomeGuide: true)),
+        hasSeenPostFirstSessionPassportPrompt: _settings.hasSeenPostFirstSessionPassportPrompt,
+        onPassportPromptSeen: () => _updateSettings(_settings.copyWith(hasSeenPostFirstSessionPassportPrompt: true)),
+        hasSeenPostPassportProfilePrompt: _settings.hasSeenPostPassportProfilePrompt,
+        onProfileInfoPromptSeen: () => _updateSettings(_settings.copyWith(hasSeenPostPassportProfilePrompt: true)),
+        hasSeenFirstInsightPrompt: _settings.hasSeenFirstInsightPrompt,
+        onInsightPromptSeen: () => _updateSettings(_settings.copyWith(hasSeenFirstInsightPrompt: true)),
+        hasUsedFirstFreeAIInsight: _settings.hasUsedFirstFreeAIInsight,
+        onFirstFreeAIInsightUsed: () => _updateSettings(_settings.copyWith(hasUsedFirstFreeAIInsight: true)),
+        levelEnTitle: _levelEnTitle,
+        levelEnDesc: _levelEnDesc,
+        comfortEn: _comfortEn,
+        boardEn: _boardEn,
+        stance: _stance,
+        height: _height,
+        weight: _weight,
+        location: _location,
+        age: _age,
+        surferSummary: _surferSummary,
+        profilePhotoPath: _profilePhotoPath,
+        stanceVisibleToCoach: _stanceVisibleToCoach,
+        stanceVisibleOnDashboard: _stanceVisibleOnDashboard,
+        heightVisibleToCoach: _heightVisibleToCoach,
+        heightVisibleOnDashboard: _heightVisibleOnDashboard,
+        weightVisibleToCoach: _weightVisibleToCoach,
+        weightVisibleOnDashboard: _weightVisibleOnDashboard,
+        locationVisibleToCoach: _locationVisibleToCoach,
+        locationVisibleOnDashboard: _locationVisibleOnDashboard,
+        ageVisibleToCoach: _ageVisibleToCoach,
+        ageVisibleOnDashboard: _ageVisibleOnDashboard,
       ),
 
 // 3 = Map
@@ -954,13 +1271,15 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         onSpotsChanged: _setSpots,
         mapKey: _mapKey,
         onReturnToDashboard: _onReturnToDashboard,
+        hasSeenMapTip: _settings.hasSeenMapTip,
+        onMapTipDismissed: () => _updateSettings(_settings.copyWith(hasSeenMapTip: true)),
       ),
 
 // 4 = Settings
       SettingsScreen(
         settings: _settings,
         onChanged: _updateSettings,
-        onResetQuickstart: _resetOnboarding,
+        onResetOnboarding: _resetOnboarding,
         onOpenSurferPro: _showSurferPro,
         onResetSessions: _performFullReset,
         onResetAppState: _performFullReset,
@@ -982,105 +1301,52 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
     ];
 
     return Scaffold(
-      body: _QuickStartWrapper(
-        onInit: (innerContext) {
-          // If we are NOT showing the onboarding screen, we check if we should show quickstart.
-          // Because _enteredThisSession is set true AT BOOT when skipping onboarding,
-          // this correctly triggers on every app reopen, but NOT on the very first ever launch
-          // because on the first ever launch _enteredThisSession is false until onboarding is dismissed.
-          if (!_showOnboarding && !_quickStartShown) {
-            if (_settings.showQuickStartOnLaunch) {
-              _showQuickStart(innerContext);
-            }
-          }
-        },
-        child: pages[_index],
-      ),
+      body: pages[_index],
+      floatingActionButton: _index == 2 ? FloatingActionButton.extended(
+        onPressed: _triggerAddSession,
+        backgroundColor: AppTheme.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: Text(_t("Log session", "Registrar sesión")),
+      ) : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
-        onTap: (i) => setState(() => _index = i),
+        onTap: (i) {
+          setState(() => _index = i);
+        },
         type: BottomNavigationBarType.fixed,
-        items: const [
+        selectedFontSize: 10,
+        unselectedFontSize: 9,
+        selectedItemColor: AppTheme.primary,
+        unselectedItemColor: AppTheme.textMuted,
+        selectedLabelStyle: const TextStyle(height: 1.1),
+        unselectedLabelStyle: const TextStyle(height: 1.1),
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.trending_up),
-            label: 'Surf Dashboard',
+            icon: const Icon(Icons.trending_up),
+            label: _t('Dashboard', 'Dashboard'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.badge),
-            label: 'Surf Passport',
+            icon: const Icon(Icons.badge),
+            label: _t('Surf\nPassport', 'Surf\nPasaporte'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.list_alt),
-            label: 'Session Logs',
+            icon: const Icon(Icons.list_alt),
+            label: _t('Log', 'Log'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Map',
+            icon: const Icon(Icons.map),
+            label: _t('Map', 'Mapa'),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
+            icon: const Icon(Icons.settings),
+            label: _t('Settings', 'Ajustes'),
           ),
         ],
       ),
     );
   }
-}
-
-class _QuickActionTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _QuickActionTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 8),
-      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
-      ),
-    );
-  }
-}
-
-class _QuickStartWrapper extends StatefulWidget {
-  final Widget child;
-  final void Function(BuildContext) onInit;
-
-  const _QuickStartWrapper({
-    required this.child,
-    required this.onInit,
-  });
-
-  @override
-  State<_QuickStartWrapper> createState() => _QuickStartWrapperState();
-}
-
-class _QuickStartWrapperState extends State<_QuickStartWrapper> {
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(Duration.zero, () {
-      if (mounted) {
-        widget.onInit(context);
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.child;
 }
 
 class _BenefitItem extends StatelessWidget {

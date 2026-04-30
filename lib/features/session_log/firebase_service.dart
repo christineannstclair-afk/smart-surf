@@ -13,6 +13,13 @@ import '../../models/surf_dashboard_data.dart';
 import 'session_log_entry.dart';
 import '../../firebase_options.dart';
 
+class RecentLoginRequiredException implements Exception {
+  final String message;
+  RecentLoginRequiredException([this.message = 'Recent login required for this operation.']);
+  @override
+  String toString() => message;
+}
+
 /// Centralized service to handle Firebase operations
 /// specifically tailored to sync Profile and Session Media
 /// via HTTPS Storage links into the local AppStorage architecture.
@@ -234,6 +241,62 @@ class FirebaseService {
     }
   }
   
+  /// Pushes the full session object to Firestore
+  Future<void> saveSessionToFirestore(SessionLogEntry entry) async {
+    await _ensureReady();
+    final uid = currentUid;
+    if (uid == null) {
+      debugPrint("Firebase: ABORTING session save. No authenticated user (UID is null).");
+      return;
+    }
+
+    final docPath = "users/$uid/sessions/${entry.id}";
+    debugPrint("----------------------------");
+    debugPrint("FIRESTORE SESSION SAVE START");
+    debugPrint("Path: $docPath");
+    
+    try {
+      final json = entry.toJson();
+      json['updatedAt'] = FieldValue.serverTimestamp();
+      
+      debugPrint("Payload: $json");
+
+      await FirebaseFirestore.instance.doc(docPath).set(
+        json, 
+        SetOptions(merge: true)
+      ).timeout(const Duration(seconds: 30));
+
+      debugPrint("FIRESTORE SESSION SAVE SUCCESS");
+      debugPrint("----------------------------");
+    } on FirebaseException catch (e) {
+      debugPrint("FIRESTORE SESSION SAVE ERROR [${e.code}]: ${e.message}");
+      debugPrint("----------------------------");
+      rethrow;
+    } catch (e) {
+      debugPrint("FIRESTORE SESSION SAVE FAILED: $e");
+      debugPrint("----------------------------");
+      rethrow;
+    }
+  }
+
+  /// Deletes a session document from Firestore
+  Future<void> deleteSessionFromFirestore(String sessionId) async {
+    await _ensureReady();
+    final uid = currentUid;
+    if (uid == null) return;
+
+    final docPath = "users/$uid/sessions/$sessionId";
+    debugPrint("FIRESTORE SESSION DELETE START: $docPath");
+    
+    try {
+      await FirebaseFirestore.instance.doc(docPath).delete()
+          .timeout(const Duration(seconds: 15));
+      debugPrint("FIRESTORE SESSION DELETE SUCCESS");
+    } catch (e) {
+      debugPrint("FIRESTORE SESSION DELETE ERROR: $e");
+    }
+  }
+
   /// Pushes session media metadata straight to Firestore.
   Future<void> syncSessionMediaToFirestore({
     required String sessionId,
@@ -242,7 +305,8 @@ class FirebaseService {
     required bool isVideo,
   }) async {
     await _ensureReady();
-    if (currentUid == null) return;
+    final uid = currentUid;
+    if (uid == null) return;
 
     if (!FirebaseService.isStableUrl(photoUrl)) {
       debugPrint("Firebase GUARDRAIL: Rejected transient session URL: $photoUrl");
@@ -258,13 +322,16 @@ class FirebaseService {
         'mediaContentType': isVideo ? 'video/mp4' : 'image/jpeg',
         'updatedAt': FieldValue.serverTimestamp(),
       };
-      debugPrint("FIRESTORE WRITE START...");
-      await FirebaseFirestore.instance.collection('users').doc(currentUid).collection('sessions').doc(docId).set(
+      
+      final docPath = "users/$uid/sessions/$docId";
+      debugPrint("FIRESTORE MEDIA SYNC START: $docPath");
+      
+      await FirebaseFirestore.instance.doc(docPath).set(
         writeData, 
         SetOptions(merge: true)
       ).timeout(const Duration(seconds: 30));
-      debugPrint("Firebase: Session media sync SUCCESS");
-      debugPrint("FIRESTORE WRITE SUCCESS");
+      
+      debugPrint("FIRESTORE MEDIA SYNC SUCCESS");
     } catch (e) {
       debugPrint("Firebase ERROR syncing session media: $e");
       rethrow;
@@ -380,6 +447,84 @@ class FirebaseService {
       debugPrint("Analytics: Logged event '$name' with params: $parameters");
     } catch (e) {
       debugPrint("Analytics ERROR: Failed to log event '$name': $e");
+    }
+  }
+
+  /// Apple Requirement: Full Account Deletion
+  Future<void> deleteUserAccount() async {
+    await _ensureReady();
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid;
+    if (user == null || uid == null) return;
+
+    try {
+      debugPrint("Firebase: INITIATING account deletion for $uid");
+
+      // 1. Delete Firestore Data (Subcollections first if possible, though deleting doc is primary)
+      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+      
+      // Delete sessions
+      final sessions = await userRef.collection('sessions').get();
+      for (var doc in sessions.docs) {
+        await doc.reference.delete();
+      }
+
+      // Delete ai_analyses
+      final analyses = await userRef.collection('ai_analyses').get();
+      for (var doc in analyses.docs) {
+        await doc.reference.delete();
+      }
+
+      // Delete spots
+      final spots = await userRef.collection('spots').get();
+      for (var doc in spots.docs) {
+        await doc.reference.delete();
+      }
+
+      // Delete main user document
+      await userRef.delete();
+      debugPrint("Firebase: Firestore data deleted for $uid");
+
+      // 2. Delete Profile Photo from Storage (Best effort)
+      try {
+        final profileRef = FirebaseStorage.instance.ref().child('users/$uid/profile/profile.jpg');
+        await profileRef.delete();
+      } catch (_) {}
+      try {
+        final profileRefPng = FirebaseStorage.instance.ref().child('users/$uid/profile/profile.png');
+        await profileRefPng.delete();
+      } catch (_) {}
+
+      // 3. Delete Firebase Auth User
+      // This may throw logic-specific errors like 'requires-recent-login'
+      await user.delete();
+      debugPrint("Firebase: Auth user deleted for $uid. Flow complete.");
+
+    } on FirebaseAuthException catch (e) {
+      debugPrint("Firebase DELETE Auth Error [${e.code}]: ${e.message}");
+      if (e.code == 'requires-recent-login') {
+         throw RecentLoginRequiredException();
+      }
+      rethrow;
+    } catch (e) {
+      debugPrint("Firebase DELETE ERROR: $e");
+      rethrow;
+    }
+  }
+
+  /// Re-authenticates the current user using the provided credential.
+  Future<void> reauthenticate(AuthCredential credential) async {
+    await _ensureReady();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw 'No user signed in.';
+
+    try {
+      debugPrint("Firebase: RE-AUTHENTICATING user...");
+      await user.reauthenticateWithCredential(credential);
+      debugPrint("Firebase: Re-authentication SUCCESS.");
+    } catch (e) {
+      debugPrint("Firebase: Re-authentication FAILED: $e");
+      rethrow;
     }
   }
 }

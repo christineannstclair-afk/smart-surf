@@ -7,12 +7,16 @@ class MicroTipBanner extends StatefulWidget {
   final String prefKey;
   final String message;
   final String? dismissLabel;
+  final bool? visible;
+  final VoidCallback? onDismiss;
 
   const MicroTipBanner({
     super.key,
     required this.prefKey,
     required this.message,
     this.dismissLabel,
+    this.visible,
+    this.onDismiss,
   });
 
   @override
@@ -26,7 +30,21 @@ class _MicroTipBannerState extends State<MicroTipBanner> {
   @override
   void initState() {
     super.initState();
-    _checkPref();
+    if (widget.visible == null) {
+      _checkPref();
+    } else {
+      _visible = widget.visible!;
+      _loaded = true;
+    }
+  }
+
+  @override
+  void didUpdateWidget(MicroTipBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.visible != null) {
+      _visible = widget.visible!;
+      _loaded = true;
+    }
   }
 
   Future<void> _checkPref() async {
@@ -41,66 +59,70 @@ class _MicroTipBannerState extends State<MicroTipBanner> {
   }
 
   Future<void> _dismiss() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(widget.prefKey, true);
-    if (mounted) setState(() => _visible = false);
+    if (widget.onDismiss != null) {
+      widget.onDismiss!();
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(widget.prefKey, true);
+      if (mounted) setState(() => _visible = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (!_loaded || !_visible) return const SizedBox.shrink();
 
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 250),
-      child: _visible
-          ? Container(
-              key: const ValueKey('visible'),
-              margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: colorScheme.primary.withOpacity(0.2),
-                ),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F7F9), // Light Seafoam tint
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.lightbulb_outline_rounded,
+            size: 20,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              widget.message,
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.4,
+                color: Colors.black87,
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.lightbulb_outline_rounded,
-                    size: 18,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      widget.message,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.onPrimaryContainer,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _dismiss,
-                    child: Text(
-                      widget.dismissLabel ?? 'Dismiss',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: _dismiss,
+            child: Text(
+              widget.dismissLabel ?? 'Got it',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
               ),
-            )
-          : const SizedBox.shrink(key: ValueKey('hidden')),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

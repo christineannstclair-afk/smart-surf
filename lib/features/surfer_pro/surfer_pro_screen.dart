@@ -15,6 +15,8 @@ import '../../ui_system/upgrade_bottom_sheet.dart';
 import '../../core/analyze_api.dart';
 import 'ai_analysis_screen.dart';
 import '../session_log/firebase_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'surfer_pro_paywall.dart';
 
 void showSurferProModal({
   required BuildContext context,
@@ -95,6 +97,14 @@ class _SurferProUpgradeContentState extends State<SurferProUpgradeContent> {
       return;
     }
 
+    if (!widget.isSurferPro) {
+      if (mounted) {
+        Navigator.pop(context); // Close modal
+        showSurfInsightPaywall(context, isSpanish: widget.isSpanish);
+      }
+      return;
+    }
+
     setState(() => _isGenerating = true);
     
     String? finalSummary;
@@ -105,7 +115,14 @@ class _SurferProUpgradeContentState extends State<SurferProUpgradeContent> {
     String? nextFocusEs;
 
     try {
+      final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+      if (idToken == null) {
+        throw Exception("Authentication required for AI analysis");
+      }
+
       final aiResult = await AnalyzeApi.analyzeReflection(
+        idToken: idToken,
+        sessionId: '', // General reflections aren't tied to a specific session_id here
         focus: '', // Safe empty string, since not captured here yet
         workedOn: _workingOnCtrl.text,
         feltHard: _feltHardCtrl.text,
@@ -114,6 +131,7 @@ class _SurferProUpgradeContentState extends State<SurferProUpgradeContent> {
         notes: '',
         language: widget.isSpanish ? 'es' : 'en',
       );
+
       finalSummary = (aiResult['session_insight_en'] ?? (widget.isSpanish ? null : aiResult['session_insight'])) as String?;
       finalProgressPattern = (aiResult['progress_pattern_en'] ?? (widget.isSpanish ? null : aiResult['progress_pattern'])) as String?;
       finalNextFocus = (aiResult['next_session_focus_en'] ?? (widget.isSpanish ? null : aiResult['next_session_focus'])) as String?;
@@ -127,12 +145,25 @@ class _SurferProUpgradeContentState extends State<SurferProUpgradeContent> {
         print("REAL AI BILINGUAL RESPONSE RECEIVED");
       }
     } catch (e) {
-      debugPrint("LLM API failed or timed out: \$e");
+      debugPrint("LLM API failed or timed out: $e");
+      if (e.toString().contains("403")) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(t("Daily AI limit reached (3/3). Try again tomorrow!", "Límite diario de IA alcanzado (3/3). ¡Intenta mañana!")),
+                backgroundColor: Colors.orange.shade800,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          setState(() => _isGenerating = false);
+          return;
+      }
       print("BACKEND CALL FAILED");
     }
 
     // Graceful fallback to _simulate models if API fails
-    if (finalSummary == null || finalSummary!.isEmpty) {
+    if ((finalSummary == null || finalSummary!.isEmpty) && (summaryEs == null || summaryEs!.isEmpty)) {
       print("FALLBACK MOCK RESPONSE USED");
       finalSummary = _simulateAISummary(_workingOnCtrl.text, _feltHardCtrl.text, _feltGoodCtrl.text);
       finalProgressPattern = '';
@@ -148,11 +179,11 @@ class _SurferProUpgradeContentState extends State<SurferProUpgradeContent> {
       aiSummary: finalSummary ?? '',
       aiProgressPattern: finalProgressPattern ?? '',
       aiNextFocus: finalNextFocus ?? '',
-      aiSummaryEn: widget.isSpanish ? null : finalSummary,
+      aiSummaryEn: finalSummary,
       aiSummaryEs: summaryEs,
-      aiProgressPatternEn: widget.isSpanish ? null : finalProgressPattern,
+      aiProgressPatternEn: finalProgressPattern,
       aiProgressPatternEs: progressEs,
-      aiNextFocusEn: widget.isSpanish ? null : finalNextFocus,
+      aiNextFocusEn: finalNextFocus,
       aiNextFocusEs: nextFocusEs,
     );
 
@@ -748,7 +779,7 @@ class _ReflectionCard extends StatelessWidget {
                             Icon(Icons.rocket_launch, size: 16, color: colorScheme.primary),
                             const SizedBox(width: 8),
                             Text(
-                              isSpanish ? "PRÓXIMO ENFOQUE" : "NEXT FOCUS",
+                              isSpanish ? "ENFOQUE DE SURF" : "SURF FOCUS",
                               style: TextStyle(
                                 fontWeight: FontWeight.w900, 
                                 fontSize: 11,
@@ -817,7 +848,7 @@ class _ShareSheetState extends State<_ShareSheet> {
 📅 Date: ${widget.reflection.date.toString().split(' ')[0]}
 🎯 Focus: ${widget.reflection.workingOn}
 🌱 Summary: ${widget.reflection.aiSummary}$patternLine
-🚀 Next Focus: ${widget.reflection.aiNextFocus}
+🚀 Surf Focus: ${widget.reflection.aiNextFocus}
 """.trim();
 
     await Clipboard.setData(ClipboardData(text: text));
@@ -1089,8 +1120,8 @@ class _VideoAnalysisModalState extends State<_VideoAnalysisModal> {
               const SizedBox(height: 24),
               Text(
                 t(
-                  "“This supports learning and does not replace coaching.”",
-                  "“Esto apoya el aprendizaje y no reemplaza el entrenamiento presencial.”"
+                  "“This supports learning and does not replace in-person guidance.”",
+                  "“Esto apoya el aprendizaje y no reemplaza la orientación presencial.”"
                 ),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic),
@@ -1217,8 +1248,8 @@ class _ComingSoonPreview extends StatelessWidget {
           const SizedBox(height: 24),
           Text(
             t(
-              "This advanced technical tool is part of our upcoming Surfer Pro suite. We're currently fine-tuning the AI to give you the most accurate coaching insights.",
-              "Esta herramienta técnica avanzada es parte de nuestra próxima suite Surfer Pro. Actualmente estamos ajustando la IA para brindarte los detalles de entrenamiento más precisos.",
+              "This advanced technical tool is part of our upcoming Surfer Pro suite. We're currently fine-tuning the AI to give you the most accurate technical insights.",
+              "Esta herramienta técnica avanzada es parte de nuestra próxima suite Surfer Pro. Actualmente estamos ajustando la IA para brindarte los detalles analíticos más precisos.",
             ),
             textAlign: TextAlign.center,
             style: TextStyle(color: colorScheme.onSurfaceVariant, height: 1.5),

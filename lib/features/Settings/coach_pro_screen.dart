@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:flutter/foundation.dart';
+import '../../core/legal_utils.dart';
 import '../coach_pro/subscription_service.dart';
 import '../../core/subscription_config.dart';
 import '../../ui_system/upgrade_bottom_sheet.dart';
@@ -46,14 +47,32 @@ class _CoachProUpgradeContentState extends State<CoachProUpgradeContent> {
 
   Future<void> _purchase() async {
     setState(() => _isLoading = true);
-    final success = await _subService.purchaseCoachPro();
-    if (mounted) {
-      _checkStatus();
-      if (success) {
+    try {
+      final success = await _subService.purchaseCoachPro();
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (success) {
+          _checkStatus();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(widget.isSpanish ? '¡Compra exitosa!' : 'Purchase successful!'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.green.shade800,
+            ),
+          );
+        } else {
+          // Silent cancellation - no SnackBar
+          debugPrint('[CoachProUpgrade] Purchase cancelled or package not found. Finishing silently.');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(widget.isSpanish ? '¡Compra exitosa!' : 'Purchase successful!'),
+            content: Text(e.toString()),
             behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red.shade800,
           ),
         );
       }
@@ -169,7 +188,7 @@ class _CoachProUpgradeContentState extends State<CoachProUpgradeContent> {
           ),
           const SizedBox(height: 16),
           
-          _CategoryHeader(title: t("Coaching Tools", "Herramientas de Coach")),
+          _CategoryHeader(title: t("Technical Tools", "Herramientas Técnicas")),
           const SizedBox(height: 12),
           _BenefitRow(
             icon: Icons.group_add_outlined,
@@ -282,6 +301,11 @@ class _CoachProUpgradeContentState extends State<CoachProUpgradeContent> {
               ],
             ),
           ), // SafeArea close
+          const SizedBox(height: 24),
+          LegalUtils.buildLegalFooter(
+            context: context, 
+            isSpanish: widget.isSpanish,
+          ),
         ],
       ),
     );

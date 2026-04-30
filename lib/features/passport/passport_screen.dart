@@ -24,8 +24,12 @@ import 'package:video_player/video_player.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../../models/surf_dashboard_data.dart';
-import '../../widgets/orientation_prompt.dart';
+import '../../widgets/micro_tip_banner.dart';
 import '../Settings/settings_models.dart';
+import '../../ui_system/surf_constants.dart';
+import 'surf_passport_edit_sheet.dart';
+import 'profile_info_edit_sheet.dart';
+
 class SurfPassportScreen extends StatefulWidget {
   final bool isSpanish;
   final void Function(bool) onSetLanguage;
@@ -128,15 +132,20 @@ class SurfPassportScreen extends StatefulWidget {
     required this.onUpdate,
     required this.onPromptDismissed,
     required this.seenPassportPrompt,
+    required this.hasSeenPassportGuidance,
+    required this.onGuidanceDismissed,
     required this.logs,
     this.onReturnToDashboard,
   });
 
+  final bool hasSeenPassportGuidance;
+  final void Function(String type) onGuidanceDismissed;
+
   @override
-  State<SurfPassportScreen> createState() => _SurfPassportScreenState();
+  State<SurfPassportScreen> createState() => SurfPassportScreenState();
 }
 
-class _SurfPassportScreenState extends State<SurfPassportScreen> {
+class SurfPassportScreenState extends State<SurfPassportScreen> {
   final GlobalKey _passportAnchorKey = GlobalKey();
   final ScreenshotController _screenshotController = ScreenshotController();
   bool _isSharing = false;
@@ -145,20 +154,6 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
   void initState() {
     super.initState();
     FirebaseService().logEvent('surf_passport_viewed');
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!widget.seenPassportPrompt) {
-        OrientationPrompt.show(
-          context: context,
-          isSpanish: widget.isSpanish,
-          title: "",
-          message: TranslationService().translate("tip_passport_message", widget.isSpanish),
-          anchorKey: _passportAnchorKey,
-          onDismiss: () {
-            widget.onPromptDismissed();
-          },
-        );
-      }
-    });
   }
 
   String _t(String en, String es) => widget.isSpanish ? es : en;
@@ -169,7 +164,7 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
       brightness: Brightness.dark,
       scaffoldBackgroundColor: const Color(0xFF0F172A), // Deep Ocean
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppTheme.primary,
+        seedColor: AppTheme.secondary,
         brightness: Brightness.dark,
         surface: const Color(0xFF1E293B),
       ),
@@ -211,6 +206,44 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (!widget.seenPassportPrompt)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0D9488), // Teal
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _t("Your Surf Passport is a quick snapshot of your level, board, comfort zone, and focus skills. Share it with a coach or surf school.", 
+                                   "Tu Pasaporte de Surf es un resumen rápido de tu nivel, tabla, zona de confort y habilidades a mejorar. Compártelo con un entrenador o escuela de surf."),
+                                style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+                              ),
+                              const SizedBox(height: 12),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: widget.onPromptDismissed,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    backgroundColor: Colors.white.withOpacity(0.2),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  ),
+                                  child: Text(
+                                    _t("Got it", "Entendido"),
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     Screenshot(
                       controller: _screenshotController,
                       child: Container(
@@ -218,12 +251,44 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // Latest Session Media (Dynamic fetch: most recent with media)
+                            _buildLastSessionMediaHeader(),
+                            
                             // Identity Block
                             _buildIdentityRow(),
-                            const SizedBox(height: 16),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _t("A quick snapshot of your surfing level, setup, and recent sessions.", 
+                                       "Un resumen rápido de tu nivel de surf, equipo y sesiones recientes."),
+                                    style: TextStyle(
+                                      fontSize: 14, 
+                                      color: Colors.white.withOpacity(0.8),
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  FilledButton.icon(
+                                    onPressed: _sharePassport,
+                                    icon: const Icon(Icons.ios_share, size: 18),
+                                    label: Text(_t("Share Passport", "Compartir Passport")),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: AppTheme.secondary,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
 
                             // Hero Level Block
-                            _buildLevelHero(levelTitle, levelDesc, key: _passportAnchorKey),
+                            _buildLevelHero(levelTitle, levelDesc),
                             const SizedBox(height: 12),
 
                             // Snapshot Grid
@@ -239,30 +304,21 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
                                   title: _t("Comfort Zone", "Zona de confort"),
                                   value: comfortLabel,
                                   icon: Icons.waves_rounded,
-                                  onEdit: _showComfortEditModal,
+                                  onEdit: () => openEditModal(action: 'comfort'),
                                 ),
                                 _InfoBlock(
                                   title: _t("Board", "Tabla"),
                                   value: boardLabel,
                                   icon: Icons.straighten_outlined,
-                                  onEdit: _showBoardEditModal,
+                                  onEdit: () => openEditModal(action: 'board'),
                                 ),
                                 _InfoBlock(title: _t("Sessions Logged", "Sesiones"), value: widget.sessionsSurfed.toString(), icon: Icons.history_edu_rounded),
                                 _InfoBlock(title: _t("Last Surfed", "Última vez"), value: _fmtShortDate(widget.lastSurfedDate), icon: Icons.calendar_today_rounded),
                               ],
                             ),
                             const SizedBox(height: 12),
-
-                            // Focus Skills
                             _buildFocusSkillsSection(focus),
-                            const SizedBox(height: 12),
 
-                            // Surf Progress (Summary logic from recent insights)
-                            _buildSurfProgressSection(),
-                            const SizedBox(height: 24),
-
-                            // Media Section
-                            _buildMediaSection(),
                           ],
                         ),
                       ),
@@ -270,7 +326,7 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
                     const SizedBox(height: 16),
 
                     // Share Button
-                    _buildShareButton(),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -297,89 +353,104 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Stack(
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: const Color(0xFF334155),
-                    backgroundImage: profileImage,
-                    onBackgroundImageError: profileImage != null
-                        ? (exception, stackTrace) => debugPrint("Profile photo error: $exception")
-                        : null,
-                    child: profileImage == null 
-                      ? const Icon(Icons.person, size: 30, color: Colors.white24) 
-                      : null,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: openProfileInfoModal,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Stack(
+                  children: [
+                    Row(
                       children: [
-                        Text(
-                          widget.displayName.isEmpty ? _t("Add your name", "Agrega tu nombre") : widget.displayName,
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundColor: const Color(0xFF334155),
+                          backgroundImage: profileImage,
+                          onBackgroundImageError: profileImage != null
+                              ? (exception, stackTrace) => debugPrint("Profile photo error: $exception")
+                              : null,
+                          child: profileImage == null 
+                            ? const Icon(Icons.person, size: 30, color: Colors.white24) 
+                            : null,
                         ),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            if (widget.stanceVisibleToCoach && widget.stance.isNotEmpty) _inlineMeta(Icons.directions_run_rounded, widget.stance),
-                            if (widget.locationVisibleToCoach && widget.location.isNotEmpty) _inlineMeta(Icons.place_rounded, widget.location),
-                            if ((widget.heightVisibleToCoach && widget.height.isNotEmpty) || (widget.weightVisibleToCoach && widget.weight.isNotEmpty))
-                              _inlineMeta(
-                                Icons.straighten_rounded,
-                                [
-                                  if (widget.heightVisibleToCoach && widget.height.isNotEmpty) widget.height,
-                                  if (widget.weightVisibleToCoach && widget.weight.isNotEmpty) widget.weight,
-                                ].join(' · '),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.displayName.isEmpty ? _t("Complete your profile", "Completa tu perfil") : widget.displayName,
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
                               ),
-                            if (widget.ageVisibleToCoach && widget.age.isNotEmpty) _inlineMeta(Icons.cake_rounded, widget.age),
-                          ],
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: SurfDashboardData(
+                                  levelTitle: widget.levelEnTitle,
+                                  levelDesc: widget.levelEnDesc,
+                                  comfortZone: widget.comfortEn,
+                                  board: widget.boardEn,
+                                  focusSkills: widget.focusEn,
+                                  age: widget.age,
+                                  displayName: widget.displayName,
+                                  profilePhotoPath: widget.profilePhotoPath,
+                                  surferSummary: widget.surferSummary,
+                                  stance: widget.stance,
+                                  height: widget.height,
+                                  weight: widget.weight,
+                                  location: widget.location,
+                                  stanceVisibleToCoach: widget.stanceVisibleToCoach,
+                                  stanceVisibleOnDashboard: widget.stanceVisibleOnDashboard,
+                                  heightVisibleToCoach: widget.heightVisibleToCoach,
+                                  heightVisibleOnDashboard: widget.heightVisibleOnDashboard,
+                                  weightVisibleToCoach: widget.weightVisibleToCoach,
+                                  weightVisibleOnDashboard: widget.weightVisibleOnDashboard,
+                                  locationVisibleToCoach: widget.locationVisibleToCoach,
+                                  locationVisibleOnDashboard: widget.locationVisibleOnDashboard,
+                                  ageVisibleToCoach: widget.ageVisibleToCoach,
+                                  ageVisibleOnDashboard: widget.ageVisibleOnDashboard,
+                                ).getVisibleProfileFields(widget.isSpanish).map((field) {
+                                  IconData icon = Icons.info_outline;
+                                  switch (field['label']?.toLowerCase()) {
+                                    case 'stance': 
+                                    case 'posición':
+                                      icon = Icons.directions_run_rounded; break;
+                                    case 'location': 
+                                    case 'ubicación':
+                                    case 'local':
+                                      icon = Icons.location_on_outlined; break;
+                                    case 'height': 
+                                    case 'altura':
+                                      icon = Icons.straighten_rounded; break;
+                                    case 'weight': 
+                                    case 'peso':
+                                      icon = Icons.monitor_weight_outlined; break;
+                                    case 'age': 
+                                    case 'edad':
+                                      icon = Icons.cake_outlined; break;
+                                  }
+                                  return _inlineMeta(icon, field['value'] ?? '');
+                                }).toList(),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              Positioned(
-                top: 0,
-                right: 0,
-                child: IconButton(
-                  icon: Icon(Icons.edit_outlined, size: 18, color: Colors.white.withOpacity(0.35)),
-                  onPressed: _showProfileEditModal,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: IgnorePointer(
+                        child: Icon(Icons.edit_outlined, size: 18, color: Colors.white.withOpacity(0.35)),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-          if (widget.surferSummary.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _buildSurferSummarySection(),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSurferSummarySection() {
-    return AppCard(
-      padding: const EdgeInsets.all(12),
-      onTap: _showProfileEditModal,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _t("SURFER SUMMARY", "RESUMEN DEL SURFER"),
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 0.8),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            widget.surferSummary,
-            style: const TextStyle(fontSize: 13, height: 1.4, color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -397,44 +468,43 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppTheme.primary.withOpacity(0.25), const Color(0xFF1E293B)],
+              colors: [AppTheme.secondary.withOpacity(0.25), const Color(0xFF1E293B)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.primary.withOpacity(0.3), width: 1.5),
+            border: Border.all(color: AppTheme.secondary.withOpacity(0.3), width: 1.5),
             boxShadow: [
-              BoxShadow(color: AppTheme.primary.withOpacity(0.1), blurRadius: 12, offset: const Offset(0, 4)),
+              BoxShadow(color: AppTheme.secondary.withOpacity(0.1), blurRadius: 12, offset: const Offset(0, 4)),
             ],
           ),
           child: InkWell(
-            onTap: _showLevelEditModal,
+            onTap: () => openEditModal(action: 'level'),
             borderRadius: BorderRadius.circular(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _t("SURF LEVEL", "NIVEL DE SURF"),
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 1.2),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  isUnset ? _t("Tap to set your surf level", "Toca para definir tu nivel") : title,
-                  style: TextStyle(
-                    fontSize: 22, 
-                    fontWeight: FontWeight.w900, 
-                    color: isUnset ? Colors.white38 : Colors.white, 
-                    letterSpacing: -0.5
-                  ),
-                ),
-                if (!isUnset) ...[
-                  const SizedBox(height: 4),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    desc,
-                    style: TextStyle(fontSize: 16, color: Colors.white.withOpacity(0.8), height: 1.2, fontWeight: FontWeight.w500),
+                    _t("SURF LEVEL", "NIVEL DE SURF"),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.secondary.withOpacity(0.95), letterSpacing: 1.2),
                   ),
+                  const SizedBox(height: 12),
+                  Text(
+                    isUnset ? _t("Tap to set your surf level", "Toca para definir tu nivel") : title,
+                    style: TextStyle(
+                      fontSize: 22, 
+                      fontWeight: FontWeight.w900, 
+                      color: isUnset ? Colors.white38 : Colors.white, 
+                      letterSpacing: -0.5
+                    ),
+                  ),
+                  if (!isUnset) ...[
+                    const SizedBox(height: 4),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -450,13 +520,9 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
   }
 
   Widget _buildFocusSkillsSection(List<String> focus) {
-    return Container(
+    return AppCard(
+      onTap: () => openEditModal(action: 'focus'),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -464,25 +530,48 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                _t("FOCUS SKILL", "HABILIDAD FOCO").toUpperCase(),
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 1.2),
+                _t("CURRENT FOCUS", "ENFOQUE ACTUAL").toUpperCase(),
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.secondary, letterSpacing: 1.2),
               ),
-              IconButton(
-                icon: Icon(Icons.edit_outlined, size: 18, color: Colors.white.withOpacity(0.35)),
-                onPressed: _showFocusEditModal,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+              IgnorePointer(
+                child: Icon(Icons.edit_outlined, size: 18, color: Colors.white.withOpacity(0.35)),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          focus.isEmpty
-              ? Text(_t("None set yet", "Sin definir"), style: const TextStyle(color: Colors.white38, fontSize: 13))
-              : Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: focus.map((en) => _FocusChip(label: PassportPresets.focusLabel(isSpanish: widget.isSpanish, enSkill: en))).toList(),
-                ),
+          () {
+            // Find latest AI Focus/Next Focus
+            String? latestAiFocus;
+            if (widget.logs.isNotEmpty) {
+              try {
+                final lastWithAi = widget.logs.firstWhere((l) => 
+                  widget.isSpanish 
+                    ? (l.aiFocusTagEs?.isNotEmpty == true || l.aiNextFocusEs?.isNotEmpty == true)
+                    : (l.aiFocusTagEn?.isNotEmpty == true || l.aiNextFocusEn?.isNotEmpty == true)
+                );
+                latestAiFocus = widget.isSpanish 
+                  ? (lastWithAi.aiFocusTagEs ?? lastWithAi.aiNextFocusEs)
+                  : (lastWithAi.aiFocusTagEn ?? lastWithAi.aiNextFocusEn);
+              } catch (_) {}
+            }
+
+            if (latestAiFocus == null && focus.isEmpty) {
+              return Text(_t("Add what you're working on", "Agrega en qué estás trabajando"), style: const TextStyle(color: Colors.white38, fontSize: 13));
+            }
+
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (latestAiFocus != null)
+                  _FocusChip(
+                    label: latestAiFocus,
+                    isPrimary: true,
+                  ),
+                ...focus.map((en) => _FocusChip(label: PassportPresets.focusLabel(isSpanish: widget.isSpanish, enSkill: en))),
+              ],
+            );
+          }(),
         ],
       ),
     );
@@ -497,7 +586,7 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
       children: [
         Text(
           _t("LATEST SESSION MEDIA", "ÚLTIMO MEDIA").toUpperCase(),
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 1.2),
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.secondary, letterSpacing: 1.2),
         ),
         const SizedBox(height: 10),
         MediaCard(
@@ -535,21 +624,31 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
         final doc = pw.Document();
         final memoryImage = pw.MemoryImage(uint8List);
         
+        final lastMediaSession = widget.logs
+            .where((s) => s.mediaPath != null && s.mediaPath!.isNotEmpty)
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
+        
+        final String? sharingMediaUrl = lastMediaSession.isNotEmpty ? lastMediaSession.first.mediaPath : widget.latestMediaPath;
+        final bool isSharingVideo = (lastMediaSession.isNotEmpty ? lastMediaSession.first.mediaType == 'video' : widget.latestMediaType == 'video');
+
         doc.addPage(
           pw.Page(
             pageFormat: PdfPageFormat.a4,
             build: (pw.Context context) {
               return pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.center,
-                children: [
-                   pw.Expanded(child: pw.Image(memoryImage, fit: pw.BoxFit.contain)),
+                 children: [
+                    pw.Text("${widget.displayName ?? 'Surfer'}'s Surf Passport", style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(height: 15),
+                    pw.Expanded(child: pw.Image(memoryImage, fit: pw.BoxFit.contain)),
                    
-                   // Requirement: If there's an HTTPS video URL, embed a clickable hyperlink below the layout
-                   if (widget.latestMediaPath != null && widget.latestMediaType == 'video')
+                    // Requirement: If there's an HTTPS video URL, embed a clickable hyperlink below the layout
+                   if (sharingMediaUrl != null && isSharingVideo)
                      pw.Container(
                        margin: const pw.EdgeInsets.only(top: 20, bottom: 20),
                        child: pw.UrlLink(
-                         destination: widget.latestMediaPath!,
+                         destination: sharingMediaUrl,
                          child: pw.Text(_t("Watch video", "Ver video"), style: pw.TextStyle(
                            color: PdfColors.blue,
                            decoration: pw.TextDecoration.underline,
@@ -582,21 +681,64 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
     }
   }
 
-  Widget _buildShareButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 54,
-      child: FilledButton.icon(
-        onPressed: _isSharing ? null : _sharePassport,
-        icon: _isSharing 
-          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-          : const Icon(Icons.ios_share_rounded, size: 20),
-        label: Text(_isSharing ? _t("Generating...", "Generando...") : _t("Share Passport", "Compartir Passport"), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-        style: FilledButton.styleFrom(
-          backgroundColor: AppTheme.primary,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
+
+  Widget _buildLastSessionMediaHeader() {
+    // Find most recent session with mediaUrl, sorted by date descending
+    final sessionsWithMedia = widget.logs
+        .where((s) => s.mediaPath != null && s.mediaPath!.isNotEmpty)
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    final latestSession = sessionsWithMedia.isNotEmpty ? sessionsWithMedia.first : null;
+    final String? mediaPath = latestSession?.mediaPath ?? widget.latestMediaPath;
+    final String? mediaType = latestSession?.mediaType ?? widget.latestMediaType;
+    final bool hasMedia = mediaPath != null;
+
+    if (!hasMedia) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                _t("LAST SESSION", "ÚLTIMA SESIÓN").toUpperCase(),
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.secondary, letterSpacing: 1.2),
+              ),
+              if (latestSession != null) ...[
+                const SizedBox(width: 8),
+                Text(
+                  "• ${_fmtShortDate(latestSession.date)}",
+                  style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.5), fontWeight: FontWeight.bold),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          MediaCard(
+            isSpanish: widget.isSpanish,
+            isEditable: false,
+            state: mediaType == 'video' ? MediaCardState.video : MediaCardState.image,
+            onAddMedia: null,
+            onTap: () {
+              if (mediaType == 'video' && mediaPath != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VideoPreviewModal(
+                      videoPath: mediaPath,
+                      isSpanish: widget.isSpanish,
+                    ),
+                  ),
+                );
+              }
+            },
+            mediaPath: mediaPath,
+            mediaType: mediaType,
+          ),
+        ],
       ),
     );
   }
@@ -612,7 +754,7 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: AppTheme.primary),
+          Icon(icon, size: 14, color: AppTheme.secondary),
           const SizedBox(width: 8),
           Text(
             value,
@@ -633,599 +775,129 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
     return "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
   }
 
-  void _callUpdate({
-    String? levelEnTitle,
-    String? levelEnDesc,
-    String? comfortEn,
-    String? boardEn,
-    List<String>? focusEn,
-    String? height,
-    String? weight,
-    String? location,
-    String? stance,
-    String? age,
-    String? surferSummary,
-    String? displayName,
-    String? profilePhotoPath,
-    bool? stanceVisibleToCoach,
-    bool? stanceVisibleOnDashboard,
-    bool? heightVisibleToCoach,
-    bool? heightVisibleOnDashboard,
-    bool? weightVisibleToCoach,
-    bool? weightVisibleOnDashboard,
-    bool? locationVisibleToCoach,
-    bool? locationVisibleOnDashboard,
-    bool? ageVisibleToCoach,
-    bool? ageVisibleOnDashboard,
-    String? latestMediaPath,
-    String? latestMediaType,
-  }) {
-    // 1. Local update
-    widget.onUpdate(
-      levelEnTitle: levelEnTitle ?? widget.levelEnTitle,
-      levelEnDesc: levelEnDesc ?? widget.levelEnDesc,
-      comfortEn: comfortEn ?? widget.comfortEn,
-      boardEn: boardEn ?? widget.boardEn,
-      focusEn: focusEn ?? widget.focusEn,
-      stance: stance ?? widget.stance,
-      height: height ?? widget.height,
-      weight: weight ?? widget.weight,
-      location: location ?? widget.location,
-      age: age ?? widget.age,
-      surferSummary: surferSummary ?? widget.surferSummary,
-      displayName: displayName ?? widget.displayName,
-      profilePhotoPath: profilePhotoPath ?? widget.profilePhotoPath,
-      stanceVisibleToCoach: stanceVisibleToCoach ?? widget.stanceVisibleToCoach,
-      stanceVisibleOnDashboard: stanceVisibleOnDashboard ?? widget.stanceVisibleOnDashboard,
-      heightVisibleToCoach: heightVisibleToCoach ?? widget.heightVisibleToCoach,
-      heightVisibleOnDashboard: heightVisibleOnDashboard ?? widget.heightVisibleOnDashboard,
-      weightVisibleToCoach: weightVisibleToCoach ?? widget.weightVisibleToCoach,
-      weightVisibleOnDashboard: weightVisibleOnDashboard ?? widget.weightVisibleOnDashboard,
-      locationVisibleToCoach: locationVisibleToCoach ?? widget.locationVisibleToCoach,
-      locationVisibleOnDashboard: locationVisibleOnDashboard ?? widget.locationVisibleOnDashboard,
-      ageVisibleToCoach: ageVisibleToCoach ?? widget.ageVisibleToCoach,
-      ageVisibleOnDashboard: ageVisibleOnDashboard ?? widget.ageVisibleOnDashboard,
-      sessionsSurfed: widget.sessionsSurfed,
-      lastSurfedDate: widget.lastSurfedDate,
-      latestMediaPath: latestMediaPath ?? widget.latestMediaPath,
-      latestMediaType: latestMediaType ?? widget.latestMediaType,
+  void openProfileInfoModal() {
+    ProfileInfoEditSheet.show(
+      context,
+      isSpanish: widget.isSpanish,
+      stance: widget.stance,
+      height: widget.height,
+      weight: widget.weight,
+      location: widget.location,
+      age: widget.age,
+      surferSummary: widget.surferSummary,
+      displayName: widget.displayName,
+      stanceVisibleToCoach: widget.stanceVisibleToCoach,
+      stanceVisibleOnDashboard: widget.stanceVisibleOnDashboard,
+      heightVisibleToCoach: widget.heightVisibleToCoach,
+      heightVisibleOnDashboard: widget.heightVisibleOnDashboard,
+      weightVisibleToCoach: widget.weightVisibleToCoach,
+      weightVisibleOnDashboard: widget.weightVisibleOnDashboard,
+      locationVisibleToCoach: widget.locationVisibleToCoach,
+      locationVisibleOnDashboard: widget.locationVisibleOnDashboard,
+      ageVisibleToCoach: widget.ageVisibleToCoach,
+      ageVisibleOnDashboard: widget.ageVisibleOnDashboard,
+      onUpdate: ({
+        required String stance,
+        required String height,
+        required String weight,
+        required String location,
+        required String age,
+        required String surferSummary,
+        required String displayName,
+        required bool stanceVisibleToCoach,
+        required bool stanceVisibleOnDashboard,
+        required bool heightVisibleToCoach,
+        required bool heightVisibleOnDashboard,
+        required bool weightVisibleToCoach,
+        required bool weightVisibleOnDashboard,
+        required bool locationVisibleToCoach,
+        required bool locationVisibleOnDashboard,
+        required bool ageVisibleToCoach,
+        required bool ageVisibleOnDashboard,
+      }) {
+        widget.onUpdate(
+          stance: stance,
+          height: height,
+          weight: weight,
+          location: location,
+          age: age,
+          surferSummary: surferSummary,
+          levelEnTitle: widget.levelEnTitle,
+          levelEnDesc: widget.levelEnDesc,
+          comfortEn: widget.comfortEn,
+          boardEn: widget.boardEn,
+          focusEn: widget.focusEn,
+          displayName: displayName,
+          profilePhotoPath: widget.profilePhotoPath,
+          stanceVisibleToCoach: stanceVisibleToCoach,
+          stanceVisibleOnDashboard: stanceVisibleOnDashboard,
+          heightVisibleToCoach: heightVisibleToCoach,
+          heightVisibleOnDashboard: heightVisibleOnDashboard,
+          weightVisibleToCoach: weightVisibleToCoach,
+          weightVisibleOnDashboard: weightVisibleOnDashboard,
+          locationVisibleToCoach: locationVisibleToCoach,
+          locationVisibleOnDashboard: locationVisibleOnDashboard,
+          ageVisibleToCoach: ageVisibleToCoach,
+          ageVisibleOnDashboard: ageVisibleOnDashboard,
+          sessionsSurfed: widget.sessionsSurfed,
+          lastSurfedDate: widget.lastSurfedDate,
+          units: widget.units,
+        );
+      },
+    );
+  }
+
+  void openEditModal({String? action}) {
+    SurfPassportEditSheet.show(
+      context,
+      isSpanish: widget.isSpanish,
+      levelEnTitle: widget.levelEnTitle,
+      levelEnDesc: widget.levelEnDesc,
+      comfortEn: widget.comfortEn,
+      boardEn: widget.boardEn,
+      focusEn: widget.focusEn,
       units: widget.units,
-    );
-
-    // 2. Firebase Sync
-    final data = SurfDashboardData(
-      levelTitle: levelEnTitle ?? widget.levelEnTitle,
-      levelDesc: levelEnDesc ?? widget.levelEnDesc,
-      comfortZone: comfortEn ?? widget.comfortEn,
-      board: boardEn ?? widget.boardEn,
-      focusSkills: focusEn ?? widget.focusEn,
-      age: age ?? widget.age,
-      displayName: displayName ?? widget.displayName,
-      profilePhotoPath: profilePhotoPath ?? widget.profilePhotoPath,
-      surferSummary: surferSummary ?? widget.surferSummary,
-      stance: stance ?? widget.stance,
-      height: height ?? widget.height,
-      weight: weight ?? widget.weight,
-      location: location ?? widget.location,
-      stanceVisibleToCoach: stanceVisibleToCoach ?? widget.stanceVisibleToCoach,
-      stanceVisibleOnDashboard: stanceVisibleOnDashboard ?? widget.stanceVisibleOnDashboard,
-      heightVisibleToCoach: heightVisibleToCoach ?? widget.heightVisibleToCoach,
-      heightVisibleOnDashboard: heightVisibleOnDashboard ?? widget.heightVisibleOnDashboard,
-      weightVisibleToCoach: weightVisibleToCoach ?? widget.weightVisibleToCoach,
-      weightVisibleOnDashboard: weightVisibleOnDashboard ?? widget.weightVisibleOnDashboard,
-      locationVisibleToCoach: locationVisibleToCoach ?? widget.locationVisibleToCoach,
-      locationVisibleOnDashboard: locationVisibleOnDashboard ?? widget.locationVisibleOnDashboard,
-      ageVisibleToCoach: ageVisibleToCoach ?? widget.ageVisibleToCoach,
-      ageVisibleOnDashboard: ageVisibleOnDashboard ?? widget.ageVisibleOnDashboard,
-      latestMediaPath: latestMediaPath ?? widget.latestMediaPath,
-      latestMediaType: latestMediaType ?? widget.latestMediaType,
-      email: FirebaseAuth.instance.currentUser?.email,
-    );
-    FirebaseService().saveFullProfile(data);
-  }
-
-  void _showLevelEditModal() {
-    _showPickerModal(
-      title: _t("Edit Surf Level", "Editar Nivel de Surf"),
-      items: PassportPresets.levels,
-      currentValue: widget.levelEnTitle,
-      onSelected: (m) => _callUpdate(levelEnTitle: m["enTitle"], levelEnDesc: m["enDesc"]),
-      itemTitle: (m) => widget.isSpanish ? m["esTitle"]! : m["enTitle"]!,
-      itemSubtitle: (m) => widget.isSpanish ? m["esDesc"]! : m["enDesc"]!,
+      initialAction: action,
+      onUpdate: ({
+        required String levelEnTitle,
+        required String levelEnDesc,
+        required String comfortEn,
+        required String boardEn,
+        required List<String> focusEn,
+      }) {
+        widget.onUpdate(
+          displayName: widget.displayName,
+          stance: widget.stance,
+          height: widget.height,
+          weight: widget.weight,
+          location: widget.location,
+          age: widget.age,
+          surferSummary: widget.surferSummary,
+          levelEnTitle: levelEnTitle,
+          levelEnDesc: levelEnDesc,
+          comfortEn: comfortEn,
+          boardEn: boardEn,
+          focusEn: focusEn,
+          profilePhotoPath: widget.profilePhotoPath,
+          sessionsSurfed: widget.sessionsSurfed,
+          lastSurfedDate: widget.lastSurfedDate,
+          units: widget.units,
+          stanceVisibleToCoach: widget.stanceVisibleToCoach,
+          stanceVisibleOnDashboard: widget.stanceVisibleOnDashboard,
+          heightVisibleToCoach: widget.heightVisibleToCoach,
+          heightVisibleOnDashboard: widget.heightVisibleOnDashboard,
+          weightVisibleToCoach: widget.weightVisibleToCoach,
+          weightVisibleOnDashboard: widget.weightVisibleOnDashboard,
+          locationVisibleToCoach: widget.locationVisibleToCoach,
+          locationVisibleOnDashboard: widget.locationVisibleOnDashboard,
+          ageVisibleToCoach: widget.ageVisibleToCoach,
+          ageVisibleOnDashboard: widget.ageVisibleOnDashboard,
+        );
+      },
     );
   }
 
-  void _showComfortEditModal() {
-    _showPickerModal(
-      title: _t("Edit Comfort Zone", "Editar Zona de Confort"),
-      items: PassportPresets.comfortZones,
-      currentValue: widget.comfortEn,
-      onSelected: (m) => _callUpdate(comfortEn: m["en"]),
-      itemTitle: (m) => PassportPresets.mapValue(isSpanish: widget.isSpanish, units: widget.units, list: PassportPresets.comfortZones, enValue: m["en"]!),
-    );
-  }
 
-  void _showBoardEditModal() {
-    _showPickerModal(
-      title: _t("Edit Board", "Editar Tabla"),
-      items: PassportPresets.boards,
-      currentValue: widget.boardEn,
-      onSelected: (m) => _callUpdate(boardEn: m["en"]),
-      itemTitle: (m) => PassportPresets.mapValue(isSpanish: widget.isSpanish, units: widget.units, list: PassportPresets.boards, enValue: m["en"]!),
-    );
-  }
-
-  void _showFocusEditModal() {
-    final List<String> currentFocus = List.from(PassportPresets.normalizeFocus(widget.focusEn));
-    String? warningMsg;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(_t("Edit Focus Skill", "Editar Habilidad Foco"), style: Theme.of(context).textTheme.titleLarge),
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: Text(_t("Cancel", "Cancelar")),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _t("Select up to 4 focus skills", "Selecciona hasta 4 habilidades foco"),
-                      style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.6)),
-                    ),
-                    if (warningMsg != null) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.withOpacity(0.5)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(child: Text(warningMsg!, style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold))),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  children: [
-                    // Preset Skills
-                    ...PassportPresets.focusSkills.map((m) {
-                      final en = m["en"]!;
-                      final isSelected = currentFocus.contains(en);
-                      return CheckboxListTile(
-                        title: Text(widget.isSpanish ? m["es"]! : en),
-                        value: isSelected,
-                        onChanged: (val) {
-                          setModalState(() {
-                            warningMsg = null;
-                            if (val == true) {
-                              if (currentFocus.length < 4) {
-                                currentFocus.add(en);
-                              } else {
-                                warningMsg = _t("You can choose up to 4 focus skills.", "Puedes elegir hasta 4 habilidades foco.");
-                              }
-                            } else {
-                              currentFocus.remove(en);
-                            }
-                          });
-                        },
-                      );
-                    }).toList(),
-                    
-                    // Custom Skills (already selected but not in presets)
-                    ...currentFocus.where((s) => !PassportPresets.focusPresetMaps.any((m) => m["en"] == s)).map((custom) {
-                      return CheckboxListTile(
-                        title: Text(custom),
-                        value: true,
-                        onChanged: (val) {
-                          setModalState(() {
-                            if (val == false) {
-                              currentFocus.remove(custom);
-                            }
-                          });
-                        },
-                      );
-                    }).toList(),
-
-                    // Add Custom Option
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: _t("Add custom focus...", "Agregar foco personalizado..."),
-                          prefixIcon: const Icon(Icons.add, size: 20),
-                          border: const OutlineInputBorder(),
-                        ),
-                        onSubmitted: (v) {
-                          if (v.trim().isNotEmpty) {
-                            setModalState(() {
-                              final text = v.trim();
-                              if (currentFocus.contains(text)) {
-                                warningMsg = _t("Skill already added.", "Habilidad ya agregada.");
-                              } else if (currentFocus.length < 4) {
-                                currentFocus.add(text);
-                              } else {
-                                warningMsg = _t("You can choose up to 4 focus skills.", "Puedes elegir hasta 4 habilidades foco.");
-                              }
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: FilledButton(
-                    onPressed: () {
-                      _callUpdate(focusEn: currentFocus);
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(_t("Focus skills updated ✔", "Habilidades foco actualizadas ✔"))),
-                      );
-                    },
-                    child: Text(_t("Save Skills", "Guardar Habilidades"), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showProfileEditModal() {
-    final nameCtrl = TextEditingController(text: widget.displayName);
-    final heightCtrl = TextEditingController(text: widget.height);
-    final weightCtrl = TextEditingController(text: widget.weight);
-    final locationCtrl = TextEditingController(text: widget.location);
-    final ageCtrl = TextEditingController(text: widget.age);
-    final summaryCtrl = TextEditingController(text: widget.surferSummary);
-    String currentStance = widget.stance;
-    bool hv = widget.heightVisibleToCoach;
-    bool wv = widget.weightVisibleToCoach;
-    bool lv = widget.locationVisibleToCoach;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Padding(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(_t("Edit Profile", "Editar Perfil"), style: Theme.of(context).textTheme.titleLarge),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: Text(_t("Cancel", "Cancelar")),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: InputDecoration(labelText: _t("Name", "Nombre"), border: const OutlineInputBorder()),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: ["Regular", "Goofy"].contains(currentStance) ? currentStance : null,
-                  decoration: InputDecoration(
-                    labelText: _t("Stance", "Posición"), 
-                    border: const OutlineInputBorder(),
-                  ),
-                  items: [
-                    DropdownMenuItem(value: "Regular", child: Text(_t("Regular", "Regular"))),
-                    DropdownMenuItem(value: "Goofy", child: Text(_t("Goofy", "Goofy"))),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) {
-                      setModalState(() => currentStance = v);
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        children: [
-                          TextField(
-                            controller: heightCtrl,
-                            decoration: InputDecoration(labelText: _t("Height", "Altura"), border: const OutlineInputBorder()),
-                          ),
-                          SwitchListTile(
-                            title: Text(_t("Height Visible on Passport", "Altura visible en Passport"), style: const TextStyle(fontSize: 11)),
-                            value: hv,
-                            onChanged: (v) {
-                              setModalState(() => hv = v);
-                            },
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          TextField(
-                            controller: weightCtrl,
-                            decoration: InputDecoration(labelText: _t("Weight", "Peso"), border: const OutlineInputBorder()),
-                          ),
-                          SwitchListTile(
-                            title: Text(_t("Weight Visible on Passport", "Peso visible en Passport"), style: const TextStyle(fontSize: 11)),
-                            value: wv,
-                            onChanged: (v) {
-                              setModalState(() => wv = v);
-                            },
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: locationCtrl,
-                  decoration: InputDecoration(labelText: _t("Location", "Ubicación"), border: const OutlineInputBorder()),
-                ),
-                SwitchListTile(
-                  title: Text(_t("Location Visible on Passport", "Ubicación visible en Passport"), style: const TextStyle(fontSize: 13)),
-                  value: lv,
-                  onChanged: (v) {
-                    setModalState(() => lv = v);
-                  },
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                const SizedBox(height: 16),
-                _buildEditField(
-                  label: _t("Age", "Edad"),
-                  controller: ageCtrl,
-                  dash: true,
-                  coach: true,
-                  onDash: (v) {},
-                  onCoach: (v) {},
-                  onChanged: (v) {}, // No direct update
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: summaryCtrl,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: _t("Surfer Summary / Coach Note", "Resumen de Surfer / Nota para Coach"),
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: FilledButton(
-                    onPressed: () {
-                      _callUpdate(
-                        displayName: nameCtrl.text,
-                        stance: currentStance,
-                        height: heightCtrl.text,
-                        weight: weightCtrl.text,
-                        location: locationCtrl.text,
-                        age: ageCtrl.text,
-                        surferSummary: summaryCtrl.text,
-                        heightVisibleToCoach: hv,
-                        weightVisibleToCoach: wv,
-                        locationVisibleToCoach: lv,
-                      );
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(_t("Profile updated ✔", "Perfil actualizado ✔"))),
-                      );
-                    },
-                    child: Text(_t("Save Profile", "Guardar Perfil"), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showPickerModal({
-    required String title,
-    required List<Map<String, String>> items,
-    required String currentValue,
-    required Function(Map<String, String>) onSelected,
-    required String Function(Map<String, String>) itemTitle,
-    String Function(Map<String, String>)? itemSubtitle,
-  }) {
-    final customCtrl = TextEditingController();
-    bool showingOther = false;
-    
-    // Check if current value is NOT in the presets
-    final bool isCustom = currentValue.isNotEmpty && !items.any((m) => (m["en"] ?? m["enTitle"]) == currentValue);
-    if (isCustom) {
-      customCtrl.text = currentValue;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(title, style: Theme.of(context).textTheme.titleLarge),
-                ),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: items.length + 1,
-                    itemBuilder: (ctx, i) {
-                      if (i == items.length) {
-                        // "Other..." option
-                        final isSelected = showingOther || (isCustom && !showingOther && customCtrl.text.isNotEmpty);
-                        if (showingOther) {
-                          return Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                            child: TextField(
-                              controller: customCtrl,
-                              autofocus: true,
-                              decoration: InputDecoration(
-                                labelText: _t("Custom Option", "Opción Personalizada"),
-                                border: const OutlineInputBorder(),
-                                suffixIcon: IconButton(
-                                  icon: const Icon(Icons.check, color: AppTheme.primary),
-                                  onPressed: () {
-                                    if (customCtrl.text.trim().isNotEmpty) {
-                                      onSelected({"en": customCtrl.text.trim()});
-                                      Navigator.pop(ctx);
-                                    }
-                                  },
-                                ),
-                              ),
-                              onSubmitted: (v) {
-                                if (v.trim().isNotEmpty) {
-                                  onSelected({"en": v.trim()});
-                                  Navigator.pop(ctx);
-                                }
-                              },
-                            ),
-                          );
-                        }
-                        return ListTile(
-                          leading: const Icon(Icons.edit_note_rounded, color: Colors.white54),
-                          title: Text(_t("Other...", "Otro..."), style: TextStyle(color: isSelected ? AppTheme.primary : null)),
-                          trailing: isSelected ? const Icon(Icons.check, color: AppTheme.primary) : null,
-                          onTap: () => setModalState(() => showingOther = true),
-                        );
-                      }
-
-                      final item = items[i];
-                      final enVal = item["en"] ?? item["enTitle"];
-                      final isSelected = !showingOther && enVal == currentValue;
-                      return ListTile(
-                        title: Text(itemTitle(item), style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? AppTheme.primary : null)),
-                        subtitle: itemSubtitle != null ? Text(itemSubtitle(item)) : null,
-                        trailing: isSelected ? const Icon(Icons.check, color: AppTheme.primary) : null,
-                        onTap: () {
-                          onSelected(item);
-                          Navigator.pop(ctx);
-                        },
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEditField({
-    required String label,
-    required TextEditingController controller,
-    required bool dash,
-    required bool coach,
-    required ValueChanged<bool> onDash,
-    required ValueChanged<bool> onCoach,
-    required ValueChanged<String> onChanged,
-  }) {
-    return Column(
-      children: [
-        TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            labelText: label,
-            border: const OutlineInputBorder(),
-          ),
-          onChanged: onChanged,
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            _toggleItem(Icons.dashboard_outlined, _t("On Dash", "En Dash"), dash, onDash),
-            const SizedBox(width: 12),
-            _toggleItem(Icons.badge_outlined, _t("To Coach", "Para Coach"), coach, onCoach),
-          ],
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _toggleItem(IconData icon, String label, bool value, ValueChanged<bool> onChanged) {
-    return InkWell(
-      onTap: () => onChanged(!value),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: value ? AppTheme.primary : AppTheme.textMuted),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: value ? FontWeight.bold : FontWeight.normal,
-                color: value ? AppTheme.primary : AppTheme.textMuted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildSurfProgressSection() {
     // Collect the 2 most recent insights
@@ -1259,7 +931,7 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
         children: [
           Text(
             _t("Surf Progress", "Progreso de Surf").toUpperCase(),
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 1.2),
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.secondary, letterSpacing: 1.2),
           ),
           const SizedBox(height: 12),
           if (nextFocus.isNotEmpty)
@@ -1277,10 +949,38 @@ class _SurfPassportScreenState extends State<SurfPassportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.white38, fontWeight: FontWeight.bold)),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.white60, fontWeight: FontWeight.bold)),
         const SizedBox(height: 2),
         Text(value, style: const TextStyle(fontSize: 13, color: Colors.white, height: 1.4)),
       ],
+    );
+  }
+
+  Widget _buildGuidanceCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.secondary.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.secondary.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: AppTheme.secondary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _t("Passport: This is your shareable surf snapshot. Share it with coaches or friends!", 
+                 "Passport: Este es tu resumen de surf para compartir. ¡Compártelo con coaches o amigos!"),
+              style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w700),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16, color: Colors.white54),
+            onPressed: () => widget.onGuidanceDismissed("passport"),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1295,18 +995,14 @@ class _InfoBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppCard(
+      onTap: onEdit,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
       child: Stack(
         children: [
           Row(
             children: [
-              Icon(icon, size: 18, color: AppTheme.primary.withOpacity(0.9)),
+              Icon(icon, size: 18, color: AppTheme.secondary),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1315,14 +1011,14 @@ class _InfoBlock extends StatelessWidget {
                   children: [
                     Text(
                       title.toUpperCase(),
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 0.8),
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.secondary.withOpacity(0.95), letterSpacing: 1.0),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       value,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white, height: 1.1),
                       maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.visible,
                     ),
                   ],
                 ),
@@ -1333,11 +1029,8 @@ class _InfoBlock extends StatelessWidget {
             Positioned(
               top: -4,
               right: -4,
-              child: IconButton(
-                icon: Icon(Icons.edit_outlined, size: 16, color: Colors.white.withOpacity(0.35)),
-                onPressed: onEdit,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+              child: IgnorePointer(
+                child: Icon(Icons.edit_outlined, size: 16, color: Colors.white.withOpacity(0.35)),
               ),
             ),
         ],
@@ -1348,16 +1041,17 @@ class _InfoBlock extends StatelessWidget {
 
 class _FocusChip extends StatelessWidget {
   final String label;
-  const _FocusChip({required this.label});
+  final bool isPrimary;
+  const _FocusChip({required this.label, this.isPrimary = false});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppTheme.primary.withOpacity(0.1),
+        color: isPrimary ? AppTheme.primary.withOpacity(0.2) : AppTheme.secondary.withOpacity(0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+        border: Border.all(color: isPrimary ? AppTheme.primary.withOpacity(0.4) : AppTheme.secondary.withOpacity(0.2)),
       ),
       child: Text(
         label,

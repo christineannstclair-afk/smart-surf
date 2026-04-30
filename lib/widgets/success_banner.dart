@@ -172,3 +172,129 @@ class _SessionLoggedBannerState extends State<SessionLoggedBanner> with SingleTi
     );
   }
 }
+
+class WinMomentBanner extends StatefulWidget {
+  final String message;
+  final bool isSpanish;
+  final VoidCallback onDismiss;
+
+  const WinMomentBanner({
+    super.key,
+    required this.message,
+    required this.isSpanish,
+    required this.onDismiss,
+  });
+
+  @override
+  State<WinMomentBanner> createState() => _WinMomentBannerState();
+
+  static void show(BuildContext context, {required String message, required bool isSpanish}) {
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return;
+    
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 20,
+        left: 16,
+        right: 16,
+        child: WinMomentBanner(
+          message: message,
+          isSpanish: isSpanish,
+          onDismiss: () => entry.remove(),
+        ),
+      ),
+    );
+
+    overlay.insert(entry);
+  }
+}
+
+class _WinMomentBannerState extends State<WinMomentBanner> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _offsetAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+
+    _offsetAnimation = Tween<Offset>(
+      begin: const Offset(0, -1.5),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+
+    _opacityAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
+
+    _controller.forward();
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) _dismiss();
+    });
+  }
+
+  Future<void> _dismiss() async {
+    await _controller.reverse();
+    widget.onDismiss();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SlideTransition(
+      position: _offsetAnimation,
+      child: FadeTransition(
+        opacity: _opacityAnimation,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0F7F9),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppTheme.primary.withOpacity(0.2),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Text("🤙", style: TextStyle(fontSize: 18)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    widget.message,
+                    style: const TextStyle(
+                      color: Color(0xFF0B4F57),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

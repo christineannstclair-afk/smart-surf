@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
-import '../../models/ai_analysis_model.dart';
-import '../../core/analyze_api.dart';
+import 'package:smart_surf/models/ai_analysis_model.dart';
+import 'package:smart_surf/core/analyze_api.dart';
+import 'package:smart_surf/storage/app_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AiAnalysisScreen extends StatefulWidget {
   final bool isSpanish;
@@ -55,7 +57,7 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
     final picker = ImagePicker();
     final video = await picker.pickVideo(
       source: source,
-      maxDuration: const Duration(seconds: 15),
+      maxDuration: const Duration(seconds: 10),
     );
     if (video != null) {
       await _initializeVideo(video);
@@ -90,21 +92,30 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
     setState(() => _isVideoLoading = false);
 
     final duration = _videoController!.value.duration;
+    debugPrint("DEBUG: Video Duration: ${duration.inSeconds}s (${duration.inMilliseconds}ms)");
+    debugPrint("DEBUG: File Size: $_fileSizeMB MB");
     
-    // Limits check
-    if (duration.inSeconds > 21 || _fileSizeMB > 85) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 5),
-          content: Text(
-            t(
-              "Video too large or long. Max 20s and 80MB. Try trimming it shorter.",
-              "Video demasiado grande/largo. Máx 20s y 80MB. Intenta recortarlo."
-            )
+    // Limits check - using 10.5 to allow for tiny encoding offsets while keeping 10s as user rule
+    if (duration.inMilliseconds > 10500 || _fileSizeMB > 50) {
+      debugPrint("DEBUG: LIMITS HIT! Showing alert...");
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(t("Video Too Long", "Video demasiado largo")),
+            content: Text(t(
+              "Videos must be 10 seconds or less.",
+              "Los videos deben durar 10 segundos o menos."
+            )),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("OK"),
+              ),
+            ],
           ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+        );
+      }
       _videoController?.dispose();
       _videoController = null;
       _videoFile = null;
@@ -172,8 +183,32 @@ setState(() => _currentStep = 3);
     });
 
     try {
+      // CLIENT-SIDE SHIELD: Check local usage before expensive API/Token spend
+      final localCount = await AppStorage.getAiUsageCount();
+      debugPrint("AiAnalysis: Local usage count: $localCount/3");
+      if (localCount >= 3) {
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(t("Daily AI limit reached (3/3). Try again tomorrow!", "Límite diario de IA alcanzado (3/3). ¡Intenta mañana!")),
+              backgroundColor: Colors.orange.shade800,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        setState(() => _currentStep = 3); // back to questions
+        return;
+      }
+
+      final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+      if (idToken == null) {
+        throw Exception("Authentication required for AI analysis");
+      }
+
       final responseData = await AnalyzeApi.uploadAndAnalyze(
         _videoFile!,
+        idToken: idToken,
+        sessionId: 'pop_up_${DateTime.now().millisecondsSinceEpoch}', // Unique ID for this generation attempt
         onProgress: (progress) {
           if (mounted) {
             setState(() => _uploadProgress = progress);
@@ -204,6 +239,7 @@ setState(() => _currentStep = 3);
       );
 
       if (mounted) {
+        await AppStorage.incrementAiUsageCount();
         setState(() {
           _result = result;
           _currentStep = 5; // Go to results
@@ -214,6 +250,16 @@ setState(() => _currentStep = 3);
         setState(() {
           _uploadError = e.toString();
         });
+        
+        if (e.toString().contains("403")) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(t("Daily AI limit reached (3/3). Try again tomorrow!", "Límite diario de IA alcanzado (3/3). ¡Intenta mañana!")),
+              backgroundColor: Colors.orange.shade800,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     }
   }
@@ -330,6 +376,19 @@ setState(() => _currentStep = 3);
           if (_isVideoLoading)
             const Center(child: CircularProgressIndicator())
           else ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: Text(
+                t("MAX 10s VIDEO", "MAX 10s VIDEO"),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
             SizedBox(
               height: 56,
               child: FilledButton.icon(
@@ -630,11 +689,10 @@ setState(() => _currentStep = 3);
               SizedBox(
                 height: 56,
                 width: double.infinity,
-                child: FilledButton.icon(
+                child: FilledButton(
                   onPressed: _generateAnalysis,
-                  icon: const Icon(Icons.refresh),
-                  label: Text(
-                    t("Retry", "Reintentar"),
+                  child: Text(
+                    t("Try Again", "Intentar de nuevo"),
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),

@@ -15,12 +15,15 @@ class SessionLogEntry {
   final String? reflectionWhatFeltGood;
   final String? reflectionWhatWasChallenging;
   final String? reflectionConditions;
+  final String? reflectionFeltOff;
   final String? aiSummaryEn;
   final String? aiSummaryEs;
   final String? aiProgressPatternEn;
   final String? aiProgressPatternEs;
   final String? aiNextFocusEn;
   final String? aiNextFocusEs;
+  final String? aiFocusTagEn;
+  final String? aiFocusTagEs;
   
   // Legacy fields for backward compatibility
   final String? aiSummary;
@@ -32,6 +35,7 @@ class SessionLogEntry {
   final String? mediaType; // "image" or "video"
   final String? waveLocation; // "Takeoff", "First section", "Mid-wave", "Closing section"
   final String? email;
+  final int? waveCount;
 
   const SessionLogEntry({
     required this.id,
@@ -47,6 +51,7 @@ class SessionLogEntry {
     this.reflectionWhatFeltGood,
     this.reflectionWhatWasChallenging,
     this.reflectionConditions,
+    this.reflectionFeltOff,
     this.aiSummary,
     this.aiProgressPattern,
     this.aiNextFocus,
@@ -56,11 +61,14 @@ class SessionLogEntry {
     this.aiProgressPatternEs,
     this.aiNextFocusEn,
     this.aiNextFocusEs,
+    this.aiFocusTagEn,
+    this.aiFocusTagEs,
     this.isCompleted = true,
     this.mediaPath,
     this.mediaType,
     this.waveLocation,
     this.email,
+    this.waveCount,
   });
 
   SessionLogEntry copyWith({
@@ -77,6 +85,7 @@ class SessionLogEntry {
     String? reflectionWhatFeltGood,
     String? reflectionWhatWasChallenging,
     String? reflectionConditions,
+    String? reflectionFeltOff,
     String? aiSummary,
     String? aiProgressPattern,
     String? aiNextFocus,
@@ -86,11 +95,14 @@ class SessionLogEntry {
     String? aiProgressPatternEs,
     String? aiNextFocusEn,
     String? aiNextFocusEs,
+    String? aiFocusTagEn,
+    String? aiFocusTagEs,
     bool? isCompleted,
     String? mediaPath,
     String? mediaType,
     String? waveLocation,
     String? email,
+    int? waveCount,
   }) {
     return SessionLogEntry(
       id: id ?? this.id,
@@ -106,6 +118,7 @@ class SessionLogEntry {
       reflectionWhatFeltGood: reflectionWhatFeltGood ?? this.reflectionWhatFeltGood,
       reflectionWhatWasChallenging: reflectionWhatWasChallenging ?? this.reflectionWhatWasChallenging,
       reflectionConditions: reflectionConditions ?? this.reflectionConditions,
+      reflectionFeltOff: reflectionFeltOff ?? this.reflectionFeltOff,
       aiSummary: aiSummary ?? this.aiSummary,
       aiProgressPattern: aiProgressPattern ?? this.aiProgressPattern,
       aiNextFocus: aiNextFocus ?? this.aiNextFocus,
@@ -115,11 +128,14 @@ class SessionLogEntry {
       aiProgressPatternEs: aiProgressPatternEs ?? this.aiProgressPatternEs,
       aiNextFocusEn: aiNextFocusEn ?? this.aiNextFocusEn,
       aiNextFocusEs: aiNextFocusEs ?? this.aiNextFocusEs,
+      aiFocusTagEn: aiFocusTagEn ?? this.aiFocusTagEn,
+      aiFocusTagEs: aiFocusTagEs ?? this.aiFocusTagEs,
       isCompleted: isCompleted ?? this.isCompleted,
       mediaPath: mediaPath ?? this.mediaPath,
       mediaType: mediaType ?? this.mediaType,
       waveLocation: waveLocation ?? this.waveLocation,
       email: email ?? this.email,
+      waveCount: waveCount ?? this.waveCount,
     );
   }
 
@@ -137,6 +153,7 @@ class SessionLogEntry {
         'reflectionWhatFeltGood': reflectionWhatFeltGood,
         'reflectionWhatWasChallenging': reflectionWhatWasChallenging,
         'reflectionConditions': reflectionConditions,
+        'reflectionFeltOff': reflectionFeltOff,
         'aiSummary': aiSummary,
         'aiProgressPattern': aiProgressPattern,
         'aiNextFocus': aiNextFocus,
@@ -146,11 +163,14 @@ class SessionLogEntry {
         'aiProgressPatternEs': aiProgressPatternEs,
         'aiNextFocusEn': aiNextFocusEn,
         'aiNextFocusEs': aiNextFocusEs,
+        'aiFocusTagEn': aiFocusTagEn,
+        'aiFocusTagEs': aiFocusTagEs,
         'isCompleted': isCompleted,
         'mediaPath': mediaPath,
         'mediaType': mediaType,
         'waveLocation': waveLocation,
         'email': email,
+        'waveCount': waveCount,
       };
 
   static SessionLogEntry fromJson(Map<String, dynamic> json) {
@@ -177,11 +197,14 @@ class SessionLogEntry {
       aiProgressPatternEs: json['aiProgressPatternEs'] as String?,
       aiNextFocusEn: json['aiNextFocusEn'] as String?,
       aiNextFocusEs: json['aiNextFocusEs'] as String?,
+      aiFocusTagEn: json['aiFocusTagEn'] as String?,
+      aiFocusTagEs: json['aiFocusTagEs'] as String?,
       isCompleted: json['isCompleted'] as bool? ?? true,
       mediaPath: json['mediaPath'] as String?,
       mediaType: json['mediaType'] as String?,
       waveLocation: json['waveLocation'] as String?,
       email: json['email'] as String?,
+      waveCount: json['waveCount'] as int?,
     );
   }
 }

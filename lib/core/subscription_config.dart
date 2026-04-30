@@ -1,16 +1,19 @@
 class SubscriptionConfig {
+  // RevenueCat API Key (Placeholder - REPLACE with your actual keys)
+  static const String apiKey = 'appl_fxKwNryJbqSKunugKjlOHeFvXkG';
+
   // Entitlement IDs (RevenueCat)
   static const String entitlementCoachPro = 'coach_pro';
-  static const String entitlementSurferPro = 'surfer_pro';
+  static const String entitlementSurferPro = 'Smart Surf App Pro';
 
   // Offering ID
   static const String offeringDefault = 'default';
 
-  // SKU / Package IDs
+  // SKU / Package IDs (Must match App Store Connect exactly)
   static const String skuCoachMonthly = 'cp_monthly';
   static const String skuCoachAnnual = 'cp_annual';
-  static const String skuSurferMonthly = 'sp_monthly';
-  static const String skuSurferAnnual = 'sp_annual';
+  static const String skuSurferMonthly = 'surfer_pro_monthly';
+  static const String skuSurferAnnual = 'surfer_pro_yearly';
 
   // Fallback Pricing (Used for Web/Mock)
   static const double priceCoachMonthly = 9.99;

@@ -51,50 +51,7 @@ class PassportPresets {
   ];
 
   // COMFORT ZONES
-  static const List<Map<String, String>> comfortZones = [
-    {
-      "en": "Whitewater · any size",
-      "es": "Espuma · cualquier tamaño",
-      "metric_en": "Whitewater · any size",
-      "metric_es": "Espuma · cualquier tamaño"
-    },
-    {
-      "en": "1–2ft green waves · beach break",
-      "es": "Olas verdes 1–2 pies · playa",
-      "metric_en": "30–60cm green waves · beach break",
-      "metric_es": "Olas verdes 30–60cm · playa"
-    },
-    {
-      "en": "1–3ft green waves · beach break",
-      "es": "Olas verdes 1–3 pies · playa",
-      "metric_en": "30–90cm green waves · beach break",
-      "metric_es": "Olas verdes 30–90cm · playa"
-    },
-    {
-      "en": "2–4ft green waves · beach break",
-      "es": "Olas verdes 2–4 pies · playa",
-      "metric_en": "60–120cm green waves · beach break",
-      "metric_es": "Olas verdes 60–120cm · playa"
-    },
-    {
-      "en": "2–4ft green waves · point/reef",
-      "es": "Olas verdes 2–4 pies · point/arrecife",
-      "metric_en": "60–120cm green waves · point/reef",
-      "metric_es": "Olas verdes 60–120cm · point/arrecife"
-    },
-    {
-      "en": "4–6ft+ green waves · beach break",
-      "es": "Olas verdes 4–6+ pies · playa",
-      "metric_en": "1.2–1.8m+ green waves · beach break",
-      "metric_es": "Olas verdes 1.2–1.8m+ · playa"
-    },
-    {
-      "en": "4–6ft+ green waves · point/reef",
-      "es": "Olas verdes 4–6+ pies · point/arrecife",
-      "metric_en": "1.2–1.8m+ green waves · point/reef",
-      "metric_es": "Olas verdes 1.2–1.8m+ · point/arrecife"
-    },
-  ];
+  static const List<Map<String, String>> comfortZones = SurfConstants.waveHeightOptions;
 
    // BOARDS
   static const List<Map<String, String>> boards = SurfConstants.boardOptions;
@@ -116,9 +73,9 @@ class PassportPresets {
     return match["en"] ?? enValue;
   }
   static List<String> get focusPresets =>
-      focusSkills.map((m) => m["en"]!).toList();
+      SurfConstants.masterFocusSkills.map((m) => m["en"]!).toList();
 
-  static List<Map<String, String>> get focusPresetMaps => focusSkills;
+  static List<Map<String, String>> get focusPresetMaps => SurfConstants.masterFocusSkills;
 
   // HELPERS
   static String levelTitle({required bool isSpanish, required String enTitle}) {

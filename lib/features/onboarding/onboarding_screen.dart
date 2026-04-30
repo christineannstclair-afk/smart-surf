@@ -6,11 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/permission_service.dart';
 import '../../core/translation_service.dart';
+import '../../core/legal_utils.dart';
 import '../../ui_system/app_theme.dart';
 import '../../ui_system/surf_constants.dart';
 import '../../widgets/smart_surf_wordmark.dart';
 import '../session_log/firebase_service.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../../widgets/micro_tip_banner.dart';
 
 class OnboardingScreen extends StatefulWidget {
 final bool isSpanish;
@@ -34,7 +38,6 @@ State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-final PageController _pageController = PageController();
 
 String? _name;
 String? _profilePhotoPath;
@@ -44,7 +47,12 @@ String? _boardType;
 bool _isUploadingPhoto = false;
 bool _isSigningIn = false;
 
-String t(String key) => TranslationService().translate(key, widget.isSpanish);
+String t(String keyOrEn, [String? es]) {
+  if (es != null) {
+    return widget.isSpanish ? es : keyOrEn;
+  }
+  return TranslationService().translate(keyOrEn, widget.isSpanish);
+}
 String _friendlyAuthMessage(FirebaseAuthException e) {
   switch (e.code) {
     case 'wrong-password':
@@ -76,78 +84,151 @@ String _friendlyAuthMessage(FirebaseAuthException e) {
 }
 
 Future<void> _pickImage() async {
-final picker = ImagePicker();
+  final picker = ImagePicker();
 
-final source = await showModalBottomSheet<ImageSource>(
-context: context,
-showDragHandle: true,
-builder: (ctx) => SafeArea(
-child: Column(
-mainAxisSize: MainAxisSize.min,
-children: [
-ListTile(
-leading: const Icon(Icons.photo_library_outlined),
-title: Text(t("onboarding_choose_photo")),
-onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-),
-ListTile(
-leading: const Icon(Icons.camera_alt_outlined),
-title: Text(t("onboarding_take_photo")),
-onTap: () => Navigator.pop(ctx, ImageSource.camera),
-),
-],
-),
-),
-);
+  final source = await showModalBottomSheet<ImageSource>(
+    context: context,
+    showDragHandle: true,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: Text(t("onboarding_choose_photo")),
+            onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+          ),
+          ListTile(
+            leading: const Icon(Icons.camera_alt_outlined),
+            title: Text(t("onboarding_take_photo")),
+            onTap: () => Navigator.pop(ctx, ImageSource.camera),
+          ),
+        ],
+      ),
+    ),
+  );
 
-if (source == null) return;
+  if (source == null) return;
 
-final picked = await picker.pickImage(
-source: source,
-maxWidth: 800,
-);
+  // 1. Unified Permission Check
+  final result = await PermissionService().handleImageSourcePermission(source);
 
-if (picked == null) return;
+  if (result == PermissionResult.granted || result == PermissionResult.limited) {
+    if (result == PermissionResult.limited && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(t(
+            "Photo library access is limited. You can manage permitted photos in iOS Settings.",
+            "El acceso a la biblioteca está limitado. Puedes gestionar las fotos permitidas en los Ajustes de iOS."
+          )),
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    // Proceed to picker
+  } else {
+     _showPermissionDeniedDialog(result, source);
+     return;
+  }
 
-setState(() => _isUploadingPhoto = true);
+  // 2. Picker
+  final picked = await picker.pickImage(
+    source: source,
+    maxWidth: 800,
+  );
 
-Uint8List? bytes;
-if (kIsWeb) {
-bytes = await picked.readAsBytes();
+  if (picked == null) return;
+
+  setState(() => _isUploadingPhoto = true);
+
+  Uint8List? bytes;
+  if (kIsWeb) {
+    bytes = await picked.readAsBytes();
+  }
+
+  final fbResult = await FirebaseService().uploadMedia(
+    localPath: picked.path,
+    isProfile: true,
+    isVideo: false,
+    webBytes: bytes,
+  );
+
+  if (!mounted) return;
+
+  if (fbResult != null && fbResult.success) {
+    setState(() {
+      _profilePhotoPath = fbResult.url;
+      _isUploadingPhoto = false;
+    });
+  } else {
+    setState(() => _isUploadingPhoto = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          t('onboarding_upload_failed') +
+          (fbResult?.errorMessage ?? t("onboarding_unknown_error")),
+        ),
+      ),
+    );
+  }
 }
 
-final fbResult = await FirebaseService().uploadMedia(
-localPath: picked.path,
-isProfile: true,
-isVideo: false,
-webBytes: bytes,
-);
+  void _showPermissionDeniedDialog(PermissionResult result, ImageSource source) {
+  final isCamera = source == ImageSource.camera;
+  
+  String title = isCamera 
+      ? t("Camera Permission", "Permiso de Cámara")
+      : t("Photos Permission", "Permiso de Fotos");
 
-if (!mounted) return;
+  String message = "";
+  if (result == PermissionResult.permanentlyDenied) {
+    message = isCamera
+        ? t(
+            "Camera access is permanently disabled. Please enable it in Settings to take a profile photo.",
+            "El acceso a la cámara está desactivado permanentemente. Por favor, actívalo en Ajustes para tomar una foto de perfil."
+          )
+        : t(
+            "Photo library access is permanently disabled. Please enable it in Settings to choose a photo.",
+            "El acceso a la biblioteca está desactivado permanentemente. Por favor, actívalo en Ajustes para elegir una foto."
+          );
+  } else {
+    message = isCamera
+        ? t(
+            "Camera access is required to take a profile photo.",
+            "Se requiere acceso a la cámara para tomar una foto de perfil."
+          )
+        : t(
+            "Photo library access is required to choose a profile photo.",
+            "Se requiere acceso a la biblioteca para elegir una foto de perfil."
+          );
+  }
 
-if (fbResult != null && fbResult.success) {
-setState(() {
-_profilePhotoPath = fbResult.url;
-_isUploadingPhoto = false;
-});
-} else {
-setState(() => _isUploadingPhoto = false);
-ScaffoldMessenger.of(context).showSnackBar(
-SnackBar(
-content: Text(
-t('onboarding_upload_failed') +
-(fbResult?.errorMessage ?? t("onboarding_unknown_error")),
-),
-),
-);
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK")),
+        if (result == PermissionResult.permanentlyDenied)
+           TextButton(
+             onPressed: () {
+               Navigator.pop(ctx);
+               openAppSettings();
+             },
+             child: Text(t("Settings", "Ajustes")),
+           ),
+      ],
+    ),
+  );
 }
-}
 
-Future<void> _signInWithGoogle() async {
-try {
-setState(() => _isSigningIn = true);
+  Future<void> _signInWithGoogle() async {
+    try {
+      setState(() => _isSigningIn = true);
 
-final googleSignIn = GoogleSignIn(
+      final googleSignIn = GoogleSignIn(
 scopes: <String>['email'],
 );
 
@@ -171,7 +252,7 @@ final googleAuth = await googleUser.authentication;
 
 if (!mounted) return;
 setState(() => _isSigningIn = false);
-await _nextPage();
+_completeOnboarding();
 } catch (e) {
 if (!mounted) return;
 setState(() => _isSigningIn = false);
@@ -181,9 +262,9 @@ SnackBar(content: Text('Google sign-in failed: $e')),
 }
 }
 
-Future<void> _signInWithApple() async {
-try {
-setState(() => _isSigningIn = true);
+  Future<void> _signInWithApple() async {
+    try {
+      setState(() => _isSigningIn = true);
 
       final appleProvider = AppleAuthProvider();
       appleProvider.addScope('email');
@@ -194,7 +275,7 @@ setState(() => _isSigningIn = true);
 
 if (!mounted) return;
 setState(() => _isSigningIn = false);
-await _nextPage();
+_completeOnboarding();
 } on FirebaseAuthException catch (e) {
 if (!mounted) return;
 setState(() => _isSigningIn = false);
@@ -214,10 +295,10 @@ SnackBar(content: Text('Apple sign-in failed: $e')),
 }
 }
 
-Future<void> _signInWithEmail() async {
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
-  bool isLogin = false;
+  Future<void> _signInWithEmail() async {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    bool isLogin = false;
 
   final shouldSubmit = await showDialog<bool>(
     context: context,
@@ -297,7 +378,6 @@ Future<void> _signInWithEmail() async {
     }
 
       if (isLogin) {
-        final credential = EmailAuthProvider.credential(email: email, password: password);
         await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: email,
           password: password,
@@ -313,7 +393,7 @@ Future<void> _signInWithEmail() async {
 
     if (!mounted) return;
     setState(() => _isSigningIn = false);
-    await _nextPage();
+    _completeOnboarding();
   } on FirebaseAuthException catch (e) {
     if (!mounted) return;
     setState(() => _isSigningIn = false);
@@ -333,337 +413,136 @@ Future<void> _signInWithEmail() async {
   }
 }
 
-Future<void> _nextPage() async {
-FocusScope.of(context).unfocus();
-await _pageController.nextPage(
-duration: const Duration(milliseconds: 300),
-curve: Curves.easeInOut,
-);
-}
+  void _completeOnboarding() {
+    FocusScope.of(context).unfocus();
+    widget.onFinish(null, null, null, null);
+  }
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
 
-void _completeOnboarding() {
-FocusScope.of(context).unfocus();
-widget.onFinish(_name, _profilePhotoPath, _comfortZone, _boardType);
-}
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: _buildStep2Login(),
+    );
+  }
 
-@override
-void dispose() {
-_pageController.dispose();
-super.dispose();
-}
+  Widget _buildStep2Login() {
+    return SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight - 64),
+              child: IntrinsicHeight(
+                child: Column(
+                  children: [
+                    const SmartSurfWordmark(),
+                    const Spacer(),
+                    const SizedBox(height: 48),
+                    Text(
+                      t("Welcome to Smart Surf", "Bienvenido a Smart Surf"),
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.textPrimary,
+                        fontSize: 28,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      t("Log your surf sessions and track your progress.", "Registra tus sesiones de surf y sigue tu progreso."),
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppTheme.textMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
 
-@override
-Widget build(BuildContext context) {
-return Scaffold(
-backgroundColor: Colors.white,
-body: PageView(
-controller: _pageController,
-physics: const NeverScrollableScrollPhysics(),
-children: [
-_buildStep2Login(),
-_buildStep3Name(),
-_buildStep4Basics(),
-],
-),
-);
-}
+                    _buildLoginButton(
+                      Icons.apple,
+                      t("onboarding_continue_apple"),
+                      _signInWithApple,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildLoginButton(
+                      Icons.g_mobiledata,
+                      t("onboarding_continue_google"),
+                      _signInWithGoogle,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildLoginButton(
+                      Icons.email_outlined,
+                      t("onboarding_continue_email"),
+                      _signInWithEmail,
+                    ),
+                    const Spacer(),
+                    const SizedBox(height: 24),
+                    LegalUtils.buildLegalFooter(
+                      context: context, 
+                      isSpanish: widget.isSpanish,
+                      fontSize: 12,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
-Widget _buildStep2Login() {
-return SafeArea(
-child: Padding(
-padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-child: Column(
-children: [
-const SmartSurfWordmark(),
-const Spacer(),
-Text(
-"Welcome to Smart Surf",
-style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-fontWeight: FontWeight.w900,
-color: AppTheme.textPrimary,
-fontSize: 28,
-),
-textAlign: TextAlign.center,
-),
-const SizedBox(height: 12),
-Text(
-"Log your sessions and get insights after every surf.",
-style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-color: AppTheme.textMuted,
-fontWeight: FontWeight.w500,
-),
-textAlign: TextAlign.center,
-),
-const SizedBox(height: 48),
-_buildLoginButton(
-Icons.apple,
-t("onboarding_continue_apple"),
-_signInWithApple,
-),
-const SizedBox(height: 16),
-_buildLoginButton(
-Icons.g_mobiledata,
-t("onboarding_continue_google"),
-_signInWithGoogle,
-),
-const SizedBox(height: 16),
-_buildLoginButton(
-Icons.email_outlined,
-t("onboarding_continue_email"),
-_signInWithEmail,
-),
-const Spacer(),
-],
-),
-),
-);
-}
-
-Widget _buildLoginButton(
-IconData icon,
-String text,
-Future<void> Function() onTap,
-) {
-return SizedBox(
-height: 56,
-width: double.infinity,
-child: OutlinedButton.icon(
-onPressed: _isSigningIn
-? null
-: () async {
-await onTap();
-},
-icon: Icon(
-icon,
-size: 24,
-color: AppTheme.textPrimary,
-),
-label: _isSigningIn
-? const SizedBox(
-width: 22,
-height: 22,
-child: CircularProgressIndicator(strokeWidth: 2),
-)
-: Text(
-text,
-style: const TextStyle(
-color: AppTheme.textPrimary,
-fontSize: 16,
-fontWeight: FontWeight.bold,
-),
-),
-style: OutlinedButton.styleFrom(
-side: BorderSide(color: Colors.grey.shade300, width: 2),
-shape: RoundedRectangleBorder(
-borderRadius: BorderRadius.circular(16),
-),
-),
-),
-);
-}
-
-Widget _buildStep3Name() {
-return SafeArea(
-child: Padding(
-padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-child: Column(
-crossAxisAlignment: CrossAxisAlignment.start,
-children: [
-const SmartSurfWordmark(),
-const SizedBox(height: 48),
-Text(
-t("onboarding_name_prompt"),
-style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-fontWeight: FontWeight.bold,
-color: AppTheme.textPrimary,
-),
-),
-const SizedBox(height: 40),
-Center(
-child: GestureDetector(
-onTap: _isUploadingPhoto ? null : _pickImage,
-child: Container(
-width: 120,
-height: 120,
-decoration: BoxDecoration(
-color: Colors.grey.shade100,
-shape: BoxShape.circle,
-border: Border.all(color: Colors.grey.shade300, width: 2),
-image: _profilePhotoPath != null
-? DecorationImage(
-image: NetworkImage(_profilePhotoPath!),
-fit: BoxFit.cover,
-)
-: null,
-),
-child: Center(
-child: _isUploadingPhoto
-? const CircularProgressIndicator()
-: _profilePhotoPath == null
-? Icon(
-Icons.add_a_photo,
-size: 40,
-color: Colors.grey.shade400,
-)
-: null,
-),
-),
-),
-),
-const SizedBox(height: 12),
-Center(
-child: Text(
-t("onboarding_add_photo_optional"),
-style: TextStyle(
-color: Theme.of(context).colorScheme.onSurfaceVariant,
-),
-),
-),
-const SizedBox(height: 40),
-TextField(
-decoration: InputDecoration(
-labelText: t("onboarding_your_name_label"),
-border: OutlineInputBorder(
-borderRadius: BorderRadius.circular(12),
-),
-filled: true,
-fillColor: AppTheme.surface,
-),
-onChanged: (val) => setState(() => _name = val),
-),
-const Spacer(),
-SizedBox(
-height: 56,
-width: double.infinity,
-child: ElevatedButton(
-onPressed: _nextPage,
-style: ElevatedButton.styleFrom(
-backgroundColor: AppTheme.primary,
-foregroundColor: Colors.white,
-shape: RoundedRectangleBorder(
-borderRadius: BorderRadius.circular(16),
-),
-elevation: 0,
-),
-child: Text(
-t("onboarding_continue"),
-style: const TextStyle(
-fontSize: 18,
-fontWeight: FontWeight.bold,
-),
-),
-),
-),
-],
-),
-),
-);
-}
-
-Widget _buildStep4Basics() {
-return SafeArea(
-child: Padding(
-padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-child: Column(
-crossAxisAlignment: CrossAxisAlignment.start,
-children: [
-const SmartSurfWordmark(),
-const SizedBox(height: 48),
-Text(
-t("onboarding_basics_title"),
-style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-fontWeight: FontWeight.bold,
-color: AppTheme.textPrimary,
-),
-),
-const SizedBox(height: 16),
-Text(
-t("onboarding_basics_subtitle"),
-style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-color: Theme.of(context).colorScheme.onSurfaceVariant,
-),
-),
-const SizedBox(height: 40),
-Text(
-t("onboarding_comfort_zone_label"),
-style: TextStyle(
-fontWeight: FontWeight.bold,
-color: Theme.of(context).colorScheme.onSurfaceVariant,
-),
-),
-const SizedBox(height: 8),
-DropdownButtonFormField<String>(
-value: _comfortZone,
-decoration: InputDecoration(
-border: OutlineInputBorder(
-borderRadius: BorderRadius.circular(12),
-),
-filled: true,
-fillColor: AppTheme.surface,
-),
-hint: Text(t("onboarding_select_wave_height")),
-items: SurfConstants.waveHeightOptions.map((opt) {
-return DropdownMenuItem(
-value: opt["en"],
-child: Text(widget.isSpanish ? opt["es"]! : opt["en"]!),
-);
-}).toList(),
-onChanged: (v) => setState(() => _comfortZone = v),
-),
-const SizedBox(height: 32),
-Text(
-t("onboarding_board_type_label"),
-style: TextStyle(
-fontWeight: FontWeight.bold,
-color: Theme.of(context).colorScheme.onSurfaceVariant,
-),
-),
-const SizedBox(height: 8),
-DropdownButtonFormField<String>(
-value: _boardType,
-decoration: InputDecoration(
-border: OutlineInputBorder(
-borderRadius: BorderRadius.circular(12),
-),
-filled: true,
-fillColor: AppTheme.surface,
-),
-hint: Text(t("onboarding_select_board")),
-items: SurfConstants.boardOptions.map((opt) {
-return DropdownMenuItem(
-value: opt["en"],
-child: Text(widget.isSpanish ? opt["es"]! : opt["en"]!),
-);
-}).toList(),
-onChanged: (v) => setState(() => _boardType = v),
-),
-const Spacer(),
-SizedBox(
-height: 56,
-width: double.infinity,
-child: ElevatedButton(
-onPressed: _completeOnboarding,
-style: ElevatedButton.styleFrom(
-backgroundColor: AppTheme.primary,
-foregroundColor: Colors.white,
-shape: RoundedRectangleBorder(
-borderRadius: BorderRadius.circular(16),
-),
-elevation: 0,
-),
-child: Text(
-t("onboarding_finish_setup"),
-style: const TextStyle(
-fontSize: 18,
-fontWeight: FontWeight.bold,
-),
-),
-),
-),
-],
-),
-),
-);
-}
+  Widget _buildLoginButton(
+    IconData icon,
+    String text,
+    Future<void> Function() onTap,
+  ) {
+    return SizedBox(
+      height: 56,
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _isSigningIn
+            ? null
+            : () async {
+                await onTap();
+                if (FirebaseAuth.instance.currentUser != null) {
+                  _completeOnboarding();
+                }
+              },
+        icon: Icon(
+          icon,
+          size: 24,
+          color: AppTheme.textPrimary,
+        ),
+        label: _isSigningIn
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(
+                text,
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: Colors.grey.shade300, width: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+    );
+  }
 }

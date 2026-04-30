@@ -14,23 +14,26 @@ import '../../widgets/app_card.dart';
 import '../../widgets/smart_surf_wordmark.dart';
 
 class MapScreen extends StatefulWidget {
-final bool isSpanish;
-final ValueChanged<bool> onSetLanguage;
+  final bool isSpanish;
+  final ValueChanged<bool> onSetLanguage;
+  final List<SurfSpot> spots;
+  final ValueChanged<List<SurfSpot>> onSpotsChanged;
+  final GlobalKey? mapKey;
+  final VoidCallback? onReturnToDashboard;
+  final bool hasSeenMapTip;
+  final VoidCallback onMapTipDismissed;
 
-final List<SurfSpot> spots;
-final ValueChanged<List<SurfSpot>> onSpotsChanged;
-final GlobalKey? mapKey;
-final VoidCallback? onReturnToDashboard;
-
-const MapScreen({
-super.key,
-required this.isSpanish,
-required this.onSetLanguage,
-required this.spots,
-required this.onSpotsChanged,
-this.mapKey,
-this.onReturnToDashboard,
-});
+  const MapScreen({
+    super.key,
+    required this.isSpanish,
+    required this.onSetLanguage,
+    required this.spots,
+    required this.onSpotsChanged,
+    required this.hasSeenMapTip,
+    required this.onMapTipDismissed,
+    this.mapKey,
+    this.onReturnToDashboard,
+  });
 
 @override
 State<MapScreen> createState() => _MapScreenState();
@@ -169,12 +172,14 @@ bottom: false,
 child: Column(
 children: [
 MicroTipBanner(
-prefKey: 'hasSeenMapTip',
-message: _t(
-"Save surf spots you want to remember.\nSearch or tap Add Spot to get started.",
-"Guarda los spots de surf que quieras recordar.\nBusca o toca Agregar Spot para comenzar.",
-),
-dismissLabel: _t('Got it', 'Entendido'),
+  prefKey: 'hasSeenMapTip',
+  visible: !widget.hasSeenMapTip,
+  onDismiss: widget.onMapTipDismissed,
+  message: _t(
+    "Save surf spots you want to remember.\nSearch or tap Add Spot to get started.",
+    "Guarda los spots de surf que quieras recordar.\nBusca o toca Agregar Spot para comenzar.",
+  ),
+  dismissLabel: _t('Got it', 'Entendido'),
 ),
 Expanded(
 child: isWide ? _buildWideLayout(spots) : _buildMobileLayout(spots),

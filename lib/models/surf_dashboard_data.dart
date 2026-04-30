@@ -87,18 +87,13 @@ class SurfDashboardData {
 
   static SurfDashboardData fromJson(Map<String, dynamic> json) {
     return SurfDashboardData(
-      levelTitle: json['levelTitle'] as String? ?? 'Independent Green Waves',
-      levelDesc: json['levelDesc'] as String? ?? 'Catches own waves · trims down the line',
-      comfortZone: json['comfortZone'] as String? ?? '1–3ft green waves · beach break',
-      board: json['board'] as String? ?? 'Soft-top 7–8 ft',
-      focusSkills: (json['focusSkills'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
-          [
-            'Angled takeoffs',
-            'Bottom turns',
-            'Speed down the line',
-          ],
+      levelTitle: json['levelTitle'] as String? ?? '',
+      levelDesc: json['levelDesc'] as String? ?? '',
+      comfortZone: json['comfortZone'] as String? ?? '',
+      board: json['board'] as String? ?? '',
+      focusSkills: (json['focusSkills'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
       age: json['age'] as String? ?? '',
-      stance: json['stance'] as String? ?? 'Regular',
+      stance: json['stance'] as String? ?? '',
       height: json['height'] as String? ?? '',
       weight: json['weight'] as String? ?? '',
       location: json['location'] as String? ?? '',
@@ -177,5 +172,51 @@ class SurfDashboardData {
       latestMediaType: latestMediaType ?? this.latestMediaType,
       email: email ?? this.email,
     );
+  }
+
+  /// Centralized visibility logic for Profile Fields
+  /// Returns a list of maps containing 'label' and 'value' for all fields marked as visible.
+  List<Map<String, String>> getVisibleProfileFields(bool isSpanish) {
+    final List<Map<String, String>> visibleFields = [];
+
+    if (stance.isNotEmpty && stanceVisibleOnDashboard) {
+      visibleFields.add({
+        "label": isSpanish ? "Posición" : "Stance",
+        "value": stance,
+      });
+    }
+    if (age.isNotEmpty && ageVisibleOnDashboard) {
+      visibleFields.add({
+        "label": isSpanish ? "Edad" : "Age",
+        "value": age,
+      });
+    }
+    if (height.isNotEmpty && heightVisibleOnDashboard) {
+      visibleFields.add({
+        "label": isSpanish ? "Altura" : "Height",
+        "value": height,
+      });
+    }
+    if (weight.isNotEmpty && weightVisibleOnDashboard) {
+      visibleFields.add({
+        "label": isSpanish ? "Peso" : "Weight",
+        "value": weight,
+      });
+    }
+    if (location.isNotEmpty && locationVisibleOnDashboard) {
+      visibleFields.add({
+        "label": isSpanish ? "Ubicación" : "Location",
+        "value": location,
+      });
+    }
+    if (surferSummary.isNotEmpty) {
+      // Summary is always visible if it exists (no explicit toggle in UI currently)
+      visibleFields.add({
+        "label": isSpanish ? "Resumen" : "Summary",
+        "value": surferSummary,
+      });
+    }
+
+    return visibleFields;
   }
 }
