@@ -144,7 +144,11 @@ MAX_FILE_SIZE = 50 * 1024 * 1024 # 50 MB
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "Smart Surf Pop-up Analyzer"}
+    return {
+        "status": "ok",
+        "service": "Smart Surf Pop-up Analyzer",
+        "deploy": "2364c85",
+    }
 
 @app.get("/api/debug_prompt")
 def debug_prompt():
