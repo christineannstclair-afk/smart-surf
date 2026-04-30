@@ -173,12 +173,17 @@ def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: s
 - What they were working on: {worked_on}
 - Notes: {notes}
 
-Write the casual, short response now. Remember: no banned words, surfer friend tone only.
+Write the response now. Follow the tone rules exactly: calm, grounded, no slang, no hype.
     """.strip()
+
+    import hashlib
+    prompt_hash = hashlib.md5(SYSTEM_PROMPT.encode()).hexdigest()[:8]
 
     print("\n" + "="*60)
     print("SMART SURF — PROMPT SENT TO OPENAI")
     print("="*60)
+    print(f"MODEL: gpt-4o-mini | TEMPERATURE: 0.4 | PROMPT HASH: {prompt_hash}")
+    print("-"*60)
     print("SYSTEM PROMPT:\n", SYSTEM_PROMPT.strip())
     print("-"*60)
     print("USER MESSAGE:\n", user_content)
@@ -191,7 +196,7 @@ Write the casual, short response now. Remember: no banned words, surfer friend t
             {"role": "user", "content": user_content}
         ],
         response_format={"type": "json_object"},
-        temperature=0.85,
+        temperature=0.4,
         max_tokens=1000
     )
 
