@@ -165,19 +165,46 @@ Write the response now. Follow the tone rules exactly: calm, grounded, no slang,
         max_tokens=1000
     )
 
+    FALLBACK = {
+        "session_insight_en": "We couldn't fully analyze this session, but your inputs were recorded.",
+        "progress_pattern_en": "Log a few more sessions to build a clearer pattern.",
+        "next_session_focus_en": "Pick one small adjustment to focus on next session.",
+        "focus_tag_en": "timing",
+        "session_insight_es": "No pudimos analizar completamente esta sesión, pero tus datos fueron registrados.",
+        "progress_pattern_es": "Registra algunas sesiones más para ver un patrón más claro.",
+        "next_session_focus_es": "Elige un pequeño ajuste en el que enfocarte la próxima sesión.",
+        "focus_tag_es": "tiempo",
+    }
+
+    raw_content = ""
     try:
-        content = response.choices[0].message.content
-        return json.loads(content)
+        raw_content = response.choices[0].message.content
+        print(f"\nRAW LLM RESPONSE:\n{raw_content}\n")
+
+        # Layer 1: direct parse (happy path — model returned clean JSON)
+        try:
+            parsed = json.loads(raw_content)
+            print("PARSED JSON SUCCESS (layer 1 — direct)")
+            return parsed
+        except json.JSONDecodeError:
+            pass
+
+        # Layer 2: extract first {...} block (handles extra prose around JSON)
+        import re
+        match = re.search(r'\{.*\}', raw_content, re.DOTALL)
+        if match:
+            try:
+                parsed = json.loads(match.group(0))
+                print("PARSED JSON SUCCESS (layer 2 — extracted substring)")
+                return parsed
+            except json.JSONDecodeError:
+                pass
+
+        # Layer 3: fallback
+        print(f"PARSE FAILED — returning fallback. Raw output was:\n{raw_content}")
+        return FALLBACK
+
     except Exception as e:
-        print(f"Error parsing LLM JSON: {e}")
-        # Return empty fields if parsing somehow breaks
-        return {
-            "session_insight_en": "",
-            "progress_pattern_en": "",
-            "next_session_focus_en": "",
-            "focus_tag_en": "",
-            "session_insight_es": "",
-            "progress_pattern_es": "",
-            "next_session_focus_es": "",
-            "focus_tag_es": ""
-        }
+        print(f"PARSE FAILED — unexpected error: {e}. Raw content: {raw_content!r}")
+        return FALLBACK
+
