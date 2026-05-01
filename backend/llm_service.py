@@ -202,6 +202,46 @@ def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: s
     if not os.getenv("OPENAI_API_KEY"):
         raise ValueError("OPENAI_API_KEY environment variable is missing.")
 
+    # 1. Normalize inputs (handle "null", None, whitespace)
+    def normalize(v):
+        if v is None: return ""
+        s = str(v).strip()
+        if s.lower() in ["", "null", "none", "undefined"]: return ""
+        return s
+
+    n_felt_good = normalize(felt_good)
+    n_felt_hard = normalize(felt_hard)
+    n_focus = normalize(focus)
+
+    # 2. Compute data richness
+    reflection_fields = [n_felt_good, n_felt_hard, normalize(worked_on), normalize(notes), normalize(conditions)]
+    filled = sum(1 for f in reflection_fields if f != "")
+    
+    print(f"\n[DataAudit] reflectionGood normalized: {n_felt_good!r}")
+    print(f"[DataAudit] reflectionOff normalized: {n_felt_hard!r}")
+    print(f"[DataAudit] focusSkill: {n_focus!r}")
+    
+    if filled == 0:
+        data_richness = "THIN"
+    elif filled <= 2:
+        data_richness = "MODERATE"
+    else:
+        data_richness = "RICH"
+
+    # 3. Hard conditional for LOW-DATA MODE vs DIAGNOSTIC
+    # Triggered if both primary feedback fields are empty
+    is_low_data = (n_felt_good == "" and n_felt_hard == "")
+    
+    if is_low_data:
+        active_prompt = LOW_DATA_SYSTEM_PROMPT + "\n\nCRITICAL: LOW DATA MODE ACTIVE. Do not diagnose."
+        prompt_mode = "LOW_DATA"
+    else:
+        active_prompt = SYSTEM_PROMPT
+        prompt_mode = "DIAGNOSTIC"
+
+    print(f"[DataAudit] isLowDataMode: {is_low_data}")
+    print(f"[DataAudit] PROMPT_MODE: {prompt_mode}")
+
     # Format history for context if available
     history_text = ""
     if history:
@@ -210,49 +250,22 @@ def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: s
             for s in history[:3]
         ]) + "\n\n"
 
-    # Compute data richness so the model knows how certain it can be
-    reflection_fields = [felt_good, felt_hard, worked_on, notes, conditions]
-    filled = sum(1 for f in reflection_fields if f and f.strip())
-    
-    print(f"[DataAudit] felt_hard: {felt_hard!r}")
-    print(f"[DataAudit] felt_good: {felt_good!r}")
-    print(f"[DataAudit] reflection_fields_filled: {filled}")
-
-    if filled == 0:
-        data_richness = "THIN"
-    elif filled <= 2:
-        data_richness = "MODERATE"
-    else:
-        data_richness = "RICH"
-    
-    print(f"[DataAudit] isLowDataMode: {data_richness == 'THIN'} ({data_richness})")
-
     user_content = f"""
 {history_text}DATA_RICHNESS: {data_richness}
 
 Session details:
-- Focus area: {focus or 'not specified'}
-- Wave height: {wave_height or 'not specified'}
-- Board: {board or 'not specified'}
-- Conditions: {conditions or '[not provided]'}
-- What felt good: {felt_good or '[not provided]'}
-- What felt tricky: {felt_hard or '[not provided]'}
-- What they were working on: {worked_on or '[not provided]'}
-- Notes: {notes or '[not provided]'}
+- Focus area: {n_focus or 'not specified'}
+- Wave height: {normalize(wave_height) or 'not specified'}
+- Board: {normalize(board) or 'not specified'}
+- Conditions: {normalize(conditions) or '[not provided]'}
+- What felt good: {n_felt_good or '[not provided]'}
+- What felt tricky: {n_felt_hard or '[not provided]'}
+- What they were working on: {normalize(worked_on) or '[not provided]'}
+- Notes: {normalize(notes) or '[not provided]'}
 
 DATA_RICHNESS is {data_richness}. Adjust certainty accordingly. Do not invent details not present above.
 Write the response now. Follow all tone and structure rules.
     """.strip()
-
-    # Hard conditional for LOW-DATA MODE
-    active_prompt = SYSTEM_PROMPT
-    is_low_data = False
-    
-    # If both main reflection fields are missing, force LOW-DATA prompt
-    if (not felt_good or not felt_good.strip()) and (not felt_hard or not felt_hard.strip()):
-        active_prompt = LOW_DATA_SYSTEM_PROMPT
-        is_low_data = True
-        print("[DataAudit] HARD CONDITIONAL: Using LOW_DATA_SYSTEM_PROMPT")
 
     import hashlib
     prompt_hash = hashlib.md5(active_prompt.encode()).hexdigest()[:8]
@@ -260,7 +273,7 @@ Write the response now. Follow all tone and structure rules.
     print("\n" + "="*60)
     print("SMART SURF — PROMPT SENT TO OPENAI")
     print("="*60)
-    print(f"MODEL: gpt-4o-mini | TEMPERATURE: 0.4 | PROMPT HASH: {prompt_hash} | LOW_DATA: {is_low_data}")
+    print(f"MODEL: gpt-4o-mini | TEMPERATURE: 0.4 | PROMPT HASH: {prompt_hash} | MODE: {prompt_mode}")
     print("-"*60)
     print("ACTIVE SYSTEM PROMPT:\n", active_prompt.strip())
     print("-"*60)
