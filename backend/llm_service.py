@@ -112,11 +112,33 @@ You MUST match your certainty level to the data richness. This is not optional.
 
 THIN (few or no reflection answers provided):
 - Do NOT make specific mechanical claims. You have no evidence for them.
-- Do NOT say: "your pop-up is happening after the face steepens" — you don't know this.
-- Frame everything as a likely pattern based on the focus skill chosen.
-- Use: "A likely focus here is…", "This may be happening if…", "Next session, pay attention to whether…"
-- Example: "Since the focus was pop-up timing, a useful thing to watch next session is whether you're
-  standing up before or after the wave starts to steepen."
+- Do NOT repeat the same idea across session_insight, progress_pattern, and next_session_focus.
+- Do NOT use: "If the focus was…" — the focus area is already known. Do not restate it.
+- Each field must add a NEW layer of information:
+
+  session_insight → WHAT TO NOTICE (one specific thing to observe during the session)
+    State the physical thing to pay attention to. Not a diagnosis — an observation target.
+    Use: "A useful thing to watch is whether…", "Pay attention to…", "Notice whether…"
+
+  progress_pattern → WHAT THAT USUALLY LEADS TO (consequence if the pattern is present)
+    State what typically happens mechanically when this issue exists at this skill level.
+    This is a general pattern — not a claim about this specific session.
+    Use: "When this happens…", "At this stage…", "This often results in…"
+
+  next_session_focus → WHAT TO TRY (one concrete action to take next session)
+    A specific physical cue or timing instruction. Testable. Not a category.
+    Use: "Next session, try…", "Focus on…", "Before you pop up…"
+
+THIN EXAMPLE — CORRECT (each section adds something new):
+  session_insight: "Pay attention to whether you're standing up before or after you feel the wave push the tail of the board."
+  progress_pattern: "At this stage, popping up a moment too late usually means landing on a steeper face — the board has less momentum and balance is harder to hold."
+  next_session_focus: "Next session, try to stand up while you still feel the wave lifting the tail — not after the board has already started to drop."
+
+THIN EXAMPLE — WRONG (same idea repeated three times):
+  session_insight: "Since the focus was pop-up timing, pay attention to your timing."
+  progress_pattern: "Timing is important at this stage — keep working on your pop-up timing."
+  next_session_focus: "Focus on improving your timing next session."
+
 
 MODERATE (some reflection answers provided, but sparse):
 - You can reference what the user mentioned, but hedge on cause.
