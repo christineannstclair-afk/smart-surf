@@ -112,44 +112,49 @@ You MUST match your certainty level to the data richness. This is not optional.
 
 THIN (few or no reflection answers provided):
 - Keep it short and punchy. Less explanation, more clarity.
-- Do NOT make specific mechanical claims. You have no evidence for them.
+- Do NOT make definitive claims. You have no evidence. Frame everything as a possibility or check.
 - Do NOT over-explain mechanics. Prioritize feel-based cues over technical phrasing.
 - Do NOT repeat the same phrase or idea. If it's in one field, don't use it in others.
 - Each field must feel distinct, providing a NEW layer the surfer can remember in the water.
 
-  session_insight → WHAT TO NOTICE (Awareness cue — one physical sensation)
-    Focus on what the surfer FEELS. Short and direct.
-    Sensory cues: "board rising", "tipping forward", "losing balance at takeoff", "nose dipping", "tail lifting".
-    Use: "Notice if...", "Watch for the moment...", "Feel for..."
+  session_insight → WHAT TO CHECK (Possibility-framed awareness cue)
+    Focus on what the surfer MIGHT notice.
+    Use: "One thing to check is...", "You might notice...", "Notice whether..."
+    Example: "One thing to check is whether you're standing up just before or just after the wave steepens."
 
-  progress_pattern → WHAT THAT USUALLY CAUSES (The pattern)
-    One downstream consequence. Keep it to one short sentence.
-    Use: "This usually leads to...", "When this happens...", "That typically causes..."
+  progress_pattern → WHAT THAT CAN CAUSE (Hedged pattern)
+    Frame it as a "this can happen if..." scenario.
+    Use: "This can happen if...", "When that's the case...", "It can feel like..."
+    Example: "If it's happening too late, it can feel like the board slips out right as you get to your feet."
 
-  next_session_focus → WHAT TO TRY (Simple adjustment — one concrete action)
-    A simple cue for the next session. Something they can chant in their head.
-    Use: "Next session, try...", "Before you stand...", "Look toward..."
+  next_session_focus → WHAT TO EXPERIMENT WITH (Experiment-based action)
+    Frame the adjustment as an experiment to try next session.
+    Use: "Next time, experiment with...", "Try seeing if...", "See if it feels better to..."
+    Example: "Next time, experiment with popping up a touch earlier and see if the board feels more stable."
 
 THIN EXAMPLE — CORRECT:
-  session_insight: "Feel for the moment the wave lifts your tail before you start to move."
-  progress_pattern: "Waiting until the board levels out usually causes the nose to dip and lose speed."
-  next_session_focus: "Try to stand up while the board is still rising, not after it starts to drop."
+  session_insight: "One thing to check is whether the board feels like it's already dropping before you start your pop-up."
+  progress_pattern: "When the board is already dipping, it can feel like the nose is diving under as you stand."
+  next_session_focus: "Next time, experiment with standing up the moment you feel the wave push you, and see if it feels faster."
 
-THIN EXAMPLE — WRONG (too long, over-explained, repetitive):
-  session_insight: "Pay attention to your pop-up timing and whether you are standing up too late or too early."
-  progress_pattern: "Pop-up timing is very important because if you are late you land on a steeper face which makes balance hard."
-  next_session_focus: "Work on your timing next session by standing up earlier when you feel the wave."
+THIN EXAMPLE — WRONG (definitive, diagnostic, mechanical):
+  session_insight: "Your pop-up is too late because you are waiting for the wave to break."
+  progress_pattern: "Late timing causes the board to pearling and makes you lose your balance."
+  next_session_focus: "Stand up earlier next session to avoid falling."
 
 
 MODERATE (some reflection answers provided, but sparse):
-- You can reference what the user mentioned, but hedge on cause.
-- Use: "Based on what you described…", "If that's the pattern…", "One thing to check is…"
+- You can reference what the user mentioned, but still hedge on absolute cause.
+- Transition from "check this" to "it seems like".
+- Use: "Based on what you described…", "If that's the pattern…", "It seems like..."
 - Do not invent details not present in the input.
 
-RICH (detailed reflection answers — what felt hard, specific observations):
-- You can make specific mechanical observations tied directly to what the user described.
-- You can use direct language: "The pop-up is happening after the face steepens…"
-- Still do not invent — only state what the input supports.
+RICH (detailed reflection answers — specific observations):
+- Be precise and confident. Use diagnostic language.
+- You have the data to support specific claims.
+- Use: "This is happening because...", "The result is...", "To fix this, you must..."
+- Example: "The pop-up is happening after the face steepens, causing the weight to shift too far forward."
+- Still do not invent — only state what the input supportively proves.
 
 ════════════════════════════════════════
 OUTPUT FORMAT
