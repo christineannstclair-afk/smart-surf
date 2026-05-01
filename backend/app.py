@@ -237,15 +237,16 @@ async def analyze_reflection(
         if request.session_id and not force_refresh:
             existing = get_existing_insight(uid, request.session_id)
             if existing:
-                print(f"[Cache] Returning cached insight for session {request.session_id}. Use ?force_refresh=true to bypass.")
+                print(f"\n[DataAudit] CACHE HIT for session {request.session_id}")
+                print(f"[DataAudit] FINAL_OUTPUT_SENT_TO_UI (CACHED): {json.dumps(existing, indent=2)}")
                 return existing
         elif request.session_id and force_refresh:
-            print(f"[Cache] force_refresh=true — bypassing cache for session {request.session_id}")
+            print(f"[DataAudit] force_refresh=true — bypassing cache for session {request.session_id}")
 
         # 2. Skip daily limit enforcement (requires verified uid — re-enable with auth)
         print("[Dev] Daily limit check skipped (auth disabled)")
 
-        # 3. Fetch recent session history (best-effort, won't fail request if unavailable)
+        # 3. Fetch recent session history
         history = []
         if db:
             try:
@@ -272,7 +273,8 @@ async def analyze_reflection(
             wave_height=request.wave_height,
             board=request.board
         )
-        print(f"[LLM] generate_reflection returned: {list(result.keys())}")
+        
+        print(f"[DataAudit] FINAL_OUTPUT_SENT_TO_UI (FRESH): {json.dumps(result, indent=2)}")
 
         # 5. Record in Firestore session document
         record_insight_in_session(uid, request.session_id, result)

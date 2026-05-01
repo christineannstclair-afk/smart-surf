@@ -164,6 +164,8 @@ def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: s
             f"- Session: Focus: {s.get('sessionFocus', 'N/A')}, Outcome: {s.get('aiNextFocusEn', 'N/A')}"
             for s in history[:3]
         ]) + "\n\n"
+    
+    print(f"\n[DataAudit] history_text sent to LLM:\n{history_text}")
 
     user_content = f"""
 {history_text}DATA_RICHNESS: {data_richness}
@@ -225,7 +227,7 @@ Write the response now. Follow all tone and structure rules.
         # Layer 1: direct parse (happy path — model returned clean JSON)
         try:
             parsed = json.loads(raw_content)
-            print("PARSED JSON SUCCESS (layer 1 — direct)")
+            print(f"[DataAudit] PARSED_RESPONSE (layer 1): {json.dumps(parsed, indent=2)}")
             return parsed
         except json.JSONDecodeError:
             pass
@@ -236,7 +238,7 @@ Write the response now. Follow all tone and structure rules.
         if match:
             try:
                 parsed = json.loads(match.group(0))
-                print("PARSED JSON SUCCESS (layer 2 — extracted substring)")
+                print(f"[DataAudit] PARSED_RESPONSE (layer 2): {json.dumps(parsed, indent=2)}")
                 return parsed
             except json.JSONDecodeError:
                 pass
