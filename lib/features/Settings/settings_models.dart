@@ -32,6 +32,7 @@ class AppSettings {
   final String defaultMapMode;
   final int insightsViewedCount;
   final int surferProPopupSuppressedUntil;
+  final int lastNudgeShownAt;
 
   const AppSettings({
     required this.isSpanish,
@@ -67,6 +68,7 @@ class AppSettings {
     this.defaultMapMode = 'default_region',
     this.insightsViewedCount = 0,
     this.surferProPopupSuppressedUntil = 0,
+    this.lastNudgeShownAt = 0,
   });
 
   AppSettings copyWith({
@@ -103,6 +105,7 @@ class AppSettings {
     String? defaultMapMode,
     int? insightsViewedCount,
     int? surferProPopupSuppressedUntil,
+    int? lastNudgeShownAt,
   }) {
     return AppSettings(
       isSpanish: isSpanish ?? this.isSpanish,
@@ -138,6 +141,7 @@ class AppSettings {
       defaultMapMode: defaultMapMode ?? this.defaultMapMode,
       insightsViewedCount: insightsViewedCount ?? this.insightsViewedCount,
       surferProPopupSuppressedUntil: surferProPopupSuppressedUntil ?? this.surferProPopupSuppressedUntil,
+      lastNudgeShownAt: lastNudgeShownAt ?? this.lastNudgeShownAt,
     );
   }
 
@@ -175,6 +179,7 @@ class AppSettings {
         'defaultMapMode': defaultMapMode,
         'insightsViewedCount': insightsViewedCount,
         'surferProPopupSuppressedUntil': surferProPopupSuppressedUntil,
+        'lastNudgeShownAt': lastNudgeShownAt,
       };
 
   static AppSettings fromJson(Map<String, dynamic> json) {
@@ -212,6 +217,7 @@ class AppSettings {
       defaultMapMode: (json['defaultMapMode'] as String?) ?? 'default_region',
       insightsViewedCount: (json['insightsViewedCount'] as int?) ?? 0,
       surferProPopupSuppressedUntil: (json['surferProPopupSuppressedUntil'] as int?) ?? 0,
+      lastNudgeShownAt: (json['lastNudgeShownAt'] as int?) ?? 0,
     );
   }
 }

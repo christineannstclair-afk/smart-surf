@@ -1243,6 +1243,10 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         onInsightPromptSeen: () => _updateSettings(_settings.copyWith(hasSeenFirstInsightPrompt: true)),
         hasUsedFirstFreeAIInsight: _settings.hasUsedFirstFreeAIInsight,
         onFirstFreeAIInsightUsed: () => _updateSettings(_settings.copyWith(hasUsedFirstFreeAIInsight: true)),
+        lastNudgeShownAt: _settings.lastNudgeShownAt,
+        onSurferProNudgeSeen: (count) {
+          _updateSettings(_settings.copyWith(lastNudgeShownAt: count));
+        },
         levelEnTitle: _levelEnTitle,
         levelEnDesc: _levelEnDesc,
         comfortEn: _comfortEn,

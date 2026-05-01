@@ -113,33 +113,30 @@ You MUST match your certainty level to the data richness. This is not optional.
 THIN (few or no reflection answers provided):
 - Keep it short and punchy. Less explanation, more clarity.
 - Do NOT make definitive claims. You have no evidence. Frame everything as a possibility or check.
-- Do NOT over-explain mechanics. Prioritize feel-based cues over technical phrasing.
-- Do NOT repeat the same phrase or idea. If it's in one field, don't use it in others.
-- Each field must feel distinct, providing a NEW layer the surfer can remember in the water.
+- Frame the insight around the Focus Area chosen by the user.
+- Use language like: "Since you chose [Focus Skill], one thing to check...", "Late [Focus Skill] can make...", "Try [Focus Skill Adjustment] and notice whether...".
+- Do NOT say "the pop-up is happening..." or "the board is sliding out" as if they are facts.
 
   session_insight → WHAT TO CHECK (Possibility-framed awareness cue)
-    Focus on what the surfer MIGHT notice.
-    Use: "One thing to check is...", "You might notice...", "Notice whether..."
-    Example: "One thing to check is whether you're standing up just before or just after the wave steepens."
+    Use: "Since you chose [Focus Skill], one thing to check is whether...", "One thing to notice next session is..."
+    Example: "Since you chose pop-up timing, one thing to check next session is whether you’re standing up while the board still feels lifted, or after it starts to tip forward."
 
   progress_pattern → WHAT THAT CAN CAUSE (Hedged pattern)
-    Frame it as a "this can happen if..." scenario.
-    Use: "This can happen if...", "When that's the case...", "It can feel like..."
-    Example: "If it's happening too late, it can feel like the board slips out right as you get to your feet."
+    Use: "[Issue] can make [Result] feel...", "When that happens, it can lead to..."
+    Example: "Late pop-ups can make balance feel harder right at takeoff, even when the wave was caught cleanly."
 
   next_session_focus → WHAT TO EXPERIMENT WITH (Experiment-based action)
-    Frame the adjustment as an experiment to try next session.
-    Use: "Next time, experiment with...", "Try seeing if...", "See if it feels better to..."
-    Example: "Next time, experiment with popping up a touch earlier and see if the board feels more stable."
+    Use: "Try [Action] and notice whether...", "Experiment with [Action] and see if..."
+    Example: "Try popping up a touch earlier and notice whether the board feels more stable underneath you."
 
 THIN EXAMPLE — CORRECT:
-  session_insight: "One thing to check is whether the board feels like it's already dropping before you start your pop-up."
-  progress_pattern: "When the board is already dipping, it can feel like the nose is diving under as you stand."
-  next_session_focus: "Next time, experiment with standing up the moment you feel the wave push you, and see if it feels faster."
+  session_insight: "Since you chose pop-up timing, one thing to check is whether you're standing up while the board still feels lifted, or after it starts to drop."
+  progress_pattern: "Late pop-ups can make balance feel harder right at takeoff, even when the wave was caught cleanly."
+  next_session_focus: "Try popping up a touch earlier and notice whether the board feels more stable underneath you."
 
 THIN EXAMPLE — WRONG (definitive, diagnostic, mechanical):
   session_insight: "Your pop-up is too late because you are waiting for the wave to break."
-  progress_pattern: "Late timing causes the board to pearling and makes you lose your balance."
+  progress_pattern: "Late timing causes the board to pearl and makes you lose your balance."
   next_session_focus: "Stand up earlier next session to avoid falling."
 
 
@@ -182,12 +179,19 @@ def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: s
     # Compute data richness so the model knows how certain it can be
     reflection_fields = [felt_good, felt_hard, worked_on, notes, conditions]
     filled = sum(1 for f in reflection_fields if f and f.strip())
+    
+    print(f"[DataAudit] felt_hard: {felt_hard!r}")
+    print(f"[DataAudit] felt_good: {felt_good!r}")
+    print(f"[DataAudit] reflection_fields_filled: {filled}")
+
     if filled == 0:
         data_richness = "THIN"
     elif filled <= 2:
         data_richness = "MODERATE"
     else:
         data_richness = "RICH"
+    
+    print(f"[DataAudit] isLowDataMode: {data_richness == 'THIN'} ({data_richness})")
 
     user_content = f"""
 {history_text}DATA_RICHNESS: {data_richness}

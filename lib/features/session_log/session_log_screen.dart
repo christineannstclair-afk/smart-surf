@@ -94,6 +94,8 @@ class SessionLogScreen extends StatefulWidget {
     this.onGenerateInsight,
     this.onOpenSurferPro,
     this.onKeepExploring,
+    this.lastNudgeShownAt = 0,
+    this.onSurferProNudgeSeen,
   });
 
   final bool isSpanish;
@@ -113,6 +115,8 @@ class SessionLogScreen extends StatefulWidget {
   final VoidCallback? onFirstFreeAIInsightUsed;
   final VoidCallback? onInsightViewed;
   final VoidCallback? onKeepExploring;
+  final int lastNudgeShownAt;
+  final void Function(int)? onSurferProNudgeSeen;
   final List<String> focusEn;
   
   final String levelEnTitle;
@@ -872,37 +876,62 @@ class SessionLogScreenState extends State<SessionLogScreen> {
   void _handlePostSessionFlow(int sessionCount) {
     if (!mounted) return;
 
-    // --- FIRST INSIGHT TRIGGER ---
-    final bool shouldTriggerFirstInsight =
-        !widget.isSurferPro &&
-        sessionCount >= 4 &&
-        !widget.hasSeenFirstInsightPrompt &&
-        !widget.hasUsedFirstFreeAIInsight;
+    final bool isPro = widget.isSurferPro;
+    final bool seenFirstPrompt = widget.hasSeenFirstInsightPrompt;
+    final bool usedFirstFree = widget.hasUsedFirstFreeAIInsight;
+    final int lastShown = widget.lastNudgeShownAt;
 
-    if (shouldTriggerFirstInsight) {
-      debugPrint('[PopupTrigger] First insight trigger fired — sessionCount=$sessionCount');
-      _triggerFirstInsightPrompt();
-      return;
-    } else {
-      if (widget.isSurferPro) {
-        debugPrint('[PopupTrigger] First insight trigger skipped: user is Pro');
-      } else if (sessionCount < 4) {
-        debugPrint('[PopupTrigger] First insight trigger skipped: sessionCount=$sessionCount < 4');
-      } else if (widget.hasSeenFirstInsightPrompt) {
-        debugPrint('[PopupTrigger] First insight trigger skipped: hasSeenFirstInsightPrompt=true');
-      } else if (widget.hasUsedFirstFreeAIInsight) {
-        debugPrint('[PopupTrigger] First insight trigger skipped: hasUsedFirstFreeAIInsight=true');
-      }
+    // --- LOGGING ---
+    debugPrint('--- [NudgeAudit] Logged Session #$sessionCount ---');
+    debugPrint('[NudgeAudit] Subscription: isPro=$isPro');
+    debugPrint('[NudgeAudit] Milestone Flags: seenFirstPrompt=$seenFirstPrompt, usedFirstFree=$usedFirstFree');
+    debugPrint('[NudgeAudit] Nudge State: lastShownAt=$lastShown');
+
+    // --- 1. FIRST FREE INSIGHT PROMPT (Session 4 milestone) ---
+    // Rule: Triggers at session 4 or later if they haven't seen it and haven't used their free insight yet.
+    final bool shouldShowFirstInsightPrompt = 
+        !isPro && 
+        sessionCount >= 4 && 
+        !seenFirstPrompt && 
+        !usedFirstFree;
+
+    debugPrint('[NudgeAudit] shouldShowFirstInsightPrompt: $shouldShowFirstInsightPrompt');
+
+    if (shouldShowFirstInsightPrompt) {
+      debugPrint('[NudgeAudit] TRIGGER: First Free Insight Prompt');
+      _triggerFirstInsightPrompt(sessionCount);
+      return; // Return early, don't show a recurring nudge on the same session
     }
 
-    // --- PASSPORT PROMPT (session 1 only) ---
+    // --- 2. RECURRING SURFER PRO NUDGE ---
+    // Rule: Only after session 7, only if they've seen the first insight prompt, and only every 3 sessions after last shown.
+    final bool isNudgeDue = (sessionCount - lastShown) >= 3;
+    final bool isMinimumSessionMet = sessionCount >= 7;
+    final bool hasClearedFirstMilestone = seenFirstPrompt || usedFirstFree;
+
+    final bool shouldShowRecurringNudge = 
+        !isPro && 
+        isMinimumSessionMet && 
+        hasClearedFirstMilestone && 
+        isNudgeDue && 
+        lastShown != sessionCount;
+
+    debugPrint('[NudgeAudit] shouldShowRecurringNudge: $shouldShowRecurringNudge (Reason: isDue=$isNudgeDue, minMet=$isMinimumSessionMet, clearedMilestone=$hasClearedFirstMilestone)');
+
+    if (shouldShowRecurringNudge) {
+      debugPrint('[NudgeAudit] TRIGGER: Recurring Surfer Pro Nudge');
+      _triggerRecurringSurferProNudge(sessionCount);
+      return;
+    }
+
+    // --- 3. PASSPORT PROMPT (Session 1 only) ---
     if (sessionCount == 1 && !widget.hasSeenPostFirstSessionPassportPrompt) {
-      debugPrint('[PopupTrigger] source=passport_prompt sessionCount=$sessionCount');
+      debugPrint('[NudgeAudit] TRIGGER: Passport Prompt');
       _triggerPassportPrompt();
     }
   }
 
-  void _triggerFirstInsightPrompt() {
+  void _triggerFirstInsightPrompt(int sessionCount) {
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -933,6 +962,7 @@ class SessionLogScreenState extends State<SessionLogScreen> {
 
                   // Mark prompt as seen so it won't re-trigger
                   if (widget.onInsightPromptSeen != null) widget.onInsightPromptSeen!();
+                  if (widget.onSurferProNudgeSeen != null) widget.onSurferProNudgeSeen!(sessionCount);
 
                   // Get the most recent completed session
                   final latestSession = widget.logs.isNotEmpty
@@ -996,16 +1026,84 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                 onPressed: () {
                   Navigator.pop(ctx);
                   if (widget.onInsightPromptSeen != null) widget.onInsightPromptSeen!();
+                  if (widget.onSurferProNudgeSeen != null) widget.onSurferProNudgeSeen!(sessionCount);
+                },
+                child: Text(
+                  t("Keep surfing", "Seguir surfeando"),
+                  style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _triggerRecurringSurferProNudge(int sessionCount) {
+    String bodyText;
+    if (sessionCount >= 13) {
+      bodyText = t(
+        "You’re starting to form real patterns. Unlock deeper insights to see what’s actually improving each session.",
+        "Estás empezando a formar patrones reales. Desbloquea insights más profundos para ver qué está mejorando realmente cada sesión.",
+      );
+    } else if (sessionCount >= 7) {
+      bodyText = t(
+        "You’re building consistency. Unlock deeper insights to see what’s actually improving each session.",
+        "Estás construyendo consistencia. Desbloquea insights más profundos para ver qué está mejorando realmente cada sesión.",
+      );
+    } else {
+      bodyText = t(
+        "You’re starting to build a rhythm. Unlock deeper insights to see what’s actually improving each session.",
+        "Estás empezando a construir un ritmo. Desbloquea insights más profundos para ver qué está mejorando realmente cada sesión.",
+      );
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        title: Text(
+          t("You're building real momentum", "Estás ganando impulso real"),
+          style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+        ),
+        content: Text(
+          bodyText,
+          style: const TextStyle(color: Color(0xFF475569), height: 1.4),
+        ),
+        actions: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (widget.onSurferProNudgeSeen != null) widget.onSurferProNudgeSeen!(sessionCount);
+                  if (widget.onOpenSurferPro != null) widget.onOpenSurferPro!();
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: Text(
+                  t("Unlock Surfer Pro", "Desbloquear Surfer Pro"),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (widget.onSurferProNudgeSeen != null) widget.onSurferProNudgeSeen!(sessionCount);
                 },
                 child: Text(
                   t("Not now", "Ahora no"),
-                  style: const TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                 ),
               ),
-              const SizedBox(height: 4),
             ],
           ),
         ],
