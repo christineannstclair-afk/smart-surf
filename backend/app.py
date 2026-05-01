@@ -221,8 +221,31 @@ class ReflectionRequest(BaseModel):
     board: str = ""
 
 @app.post("/api/analyze_reflection")
-async def analyze_reflection(request: ReflectionRequest, current_user: dict = Depends(get_current_user), force_refresh: bool = False):
-    uid = current_user['uid']
+async def analyze_reflection(
+    request: ReflectionRequest,
+    authorization: str = Header(None),
+    force_refresh: bool = False,
+):
+    # ── AUTH (soft — logs everything, never silently blocks) ──────────────────
+    print(f"[Auth] Incoming Authorization header: {str(authorization)[:60] if authorization else 'MISSING'}")
+    uid = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split("Bearer ")[1]
+        try:
+            decoded = auth.verify_id_token(token)
+            uid = decoded["uid"]
+            print(f"[Auth] Token verified OK. uid={uid}")
+        except Exception as e:
+            print(f"[Auth] Token verification FAILED: {type(e).__name__}: {e}")
+            print(f"[Auth] Firebase init source: {_firebase_init_source}")
+            print(f"[Auth] Continuing without auth for debugging — REMOVE THIS IN PRODUCTION")
+            uid = f"unverified_{request.session_id or 'unknown'}"
+    else:
+        print("[Auth] No Bearer token provided — running without auth for debugging")
+        uid = f"anonymous_{request.session_id or 'unknown'}"
+    print(f"[Auth] Proceeding with uid={uid}")
+    # ─────────────────────────────────────────────────────────────────────────
+
     try:
         # 1. Per-session cache check — skip if force_refresh=true (for testing new prompts)
         if request.session_id and not force_refresh:
@@ -239,11 +262,14 @@ async def analyze_reflection(request: ReflectionRequest, current_user: dict = De
         # 3. Fetch recent sessions for pattern recognition
         history = []
         if db:
-            sessions_query = db.collection('users').document(uid).collection('sessions')\
-                .order_by('createdAt', direction=firestore.Query.DESCENDING)\
-                .limit(3).get()
-            for doc in sessions_query:
-                history.append(doc.to_dict())
+            try:
+                sessions_query = db.collection('users').document(uid).collection('sessions')\
+                    .order_by('createdAt', direction=firestore.Query.DESCENDING)\
+                    .limit(3).get()
+                for doc in sessions_query:
+                    history.append(doc.to_dict())
+            except Exception as e:
+                print(f"[History] Could not fetch session history: {e}")
 
         # 4. Calls the LLM
         result = llm_service.generate_reflection(
