@@ -18,6 +18,7 @@ import analyzer
 import llm_service
 
 # Initialize Firebase Admin
+_firebase_init_source = "none"
 try:
     if not firebase_admin._apps:
         service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
@@ -26,21 +27,31 @@ try:
             cred_dict = json.loads(service_account_json)
             cred = credentials.Certificate(cred_dict)
             firebase_admin.initialize_app(cred)
-            print("Firebase Admin initialized via environment variable.")
+            _firebase_init_source = "env_var:FIREBASE_SERVICE_ACCOUNT_JSON"
+            print(f"[Firebase] Initialized via environment variable. Project: {cred_dict.get('project_id', 'unknown')}")
         else:
             # Local: Try to load from local file if it exists, otherwise default
             local_key = "service-account.json"
             if os.path.exists(local_key):
                 cred = credentials.Certificate(local_key)
                 firebase_admin.initialize_app(cred)
-                print(f"Firebase Admin initialized via {local_key}.")
+                _firebase_init_source = f"local_file:{local_key}"
+                print(f"[Firebase] Initialized via {local_key}.")
             else:
                 firebase_admin.initialize_app()
-                print("Firebase Admin initialized via default credentials.")
+                _firebase_init_source = "default_credentials"
+                print("[Firebase] WARNING: Initialized via DEFAULT credentials.")
+                print("[Firebase] WARNING: Default credentials CANNOT verify user ID tokens.")
+                print("[Firebase] WARNING: All auth.verify_id_token() calls will fail with 401.")
+                print("[Firebase] WARNING: Set FIREBASE_SERVICE_ACCOUNT_JSON in Render env vars to fix.")
+    else:
+        _firebase_init_source = "already_initialized"
     
     db = firestore.client()
+    print(f"[Firebase] Firestore client ready. Init source: {_firebase_init_source}")
 except Exception as e:
-    print(f"ERROR: Failed to initialize Firebase Admin: {e}")
+    print(f"[Firebase] ERROR: Failed to initialize Firebase Admin: {e}")
+    print(f"[Firebase] ERROR: type={type(e).__name__}")
     db = None
 
 def get_current_user(authorization: str = Header(None)):
@@ -52,8 +63,10 @@ def get_current_user(authorization: str = Header(None)):
         decoded_token = auth.verify_id_token(token)
         return decoded_token
     except Exception as e:
-        print(f"Token verification failed: {e}")
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        print(f"[Auth] Token verification FAILED: {type(e).__name__}: {e}")
+        print(f"[Auth] Firebase init source was: {_firebase_init_source}")
+        print(f"[Auth] Token prefix: {token[:30]}...")
+        raise HTTPException(status_code=401, detail=f"Token verification failed: {type(e).__name__}")
 
 def get_existing_insight(uid: str, session_id: str):
     """Checks if a session already has an AI insight and returns it if it does."""
