@@ -223,43 +223,29 @@ class ReflectionRequest(BaseModel):
 @app.post("/api/analyze_reflection")
 async def analyze_reflection(
     request: ReflectionRequest,
-    authorization: str = Header(None),
     force_refresh: bool = False,
 ):
-    # ── AUTH (soft — logs everything, never silently blocks) ──────────────────
-    print(f"[Auth] Incoming Authorization header: {str(authorization)[:60] if authorization else 'MISSING'}")
-    uid = None
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.split("Bearer ")[1]
-        try:
-            decoded = auth.verify_id_token(token)
-            uid = decoded["uid"]
-            print(f"[Auth] Token verified OK. uid={uid}")
-        except Exception as e:
-            print(f"[Auth] Token verification FAILED: {type(e).__name__}: {e}")
-            print(f"[Auth] Firebase init source: {_firebase_init_source}")
-            print(f"[Auth] Continuing without auth for debugging — REMOVE THIS IN PRODUCTION")
-            uid = f"unverified_{request.session_id or 'unknown'}"
-    else:
-        print("[Auth] No Bearer token provided — running without auth for debugging")
-        uid = f"anonymous_{request.session_id or 'unknown'}"
-    print(f"[Auth] Proceeding with uid={uid}")
+    # ── AUTH DISABLED FOR DEVELOPMENT ─────────────────────────────────────────
+    # TODO: Re-enable auth before production release
+    # Use session_id as uid so Firestore writes have a stable key
+    uid = request.session_id or "dev_user"
+    print(f"[Dev] Auth disabled. uid={uid}")
     # ─────────────────────────────────────────────────────────────────────────
 
     try:
-        # 1. Per-session cache check — skip if force_refresh=true (for testing new prompts)
+        # 1. Per-session cache check
         if request.session_id and not force_refresh:
             existing = get_existing_insight(uid, request.session_id)
             if existing:
                 print(f"[Cache] Returning cached insight for session {request.session_id}. Use ?force_refresh=true to bypass.")
                 return existing
         elif request.session_id and force_refresh:
-            print(f"[Cache] force_refresh=true — bypassing Firestore cache for session {request.session_id}")
-        
-        # 2. Daily limit check & Atomic Increment: block if 3/3
-        atomic_check_and_increment_limit(uid)
-        
-        # 3. Fetch recent sessions for pattern recognition
+            print(f"[Cache] force_refresh=true — bypassing cache for session {request.session_id}")
+
+        # 2. Skip daily limit enforcement (requires verified uid — re-enable with auth)
+        print("[Dev] Daily limit check skipped (auth disabled)")
+
+        # 3. Fetch recent session history (best-effort, won't fail request if unavailable)
         history = []
         if db:
             try:
@@ -268,10 +254,12 @@ async def analyze_reflection(
                     .limit(3).get()
                 for doc in sessions_query:
                     history.append(doc.to_dict())
+                print(f"[History] Loaded {len(history)} recent sessions")
             except Exception as e:
-                print(f"[History] Could not fetch session history: {e}")
+                print(f"[History] Could not fetch session history (non-fatal): {e}")
 
-        # 4. Calls the LLM
+        # 4. Call the LLM
+        print(f"[LLM] Calling generate_reflection — focus={request.focus!r}, felt_hard={request.felt_hard!r}")
         result = llm_service.generate_reflection(
             focus=request.focus,
             worked_on=request.worked_on,
@@ -284,10 +272,12 @@ async def analyze_reflection(
             wave_height=request.wave_height,
             board=request.board
         )
-        
-        # 5. Success! Record in session
+        print(f"[LLM] generate_reflection returned: {list(result.keys())}")
+
+        # 5. Record in Firestore session document
         record_insight_in_session(uid, request.session_id, result)
-        
+        print("[LLM] Insight recorded in Firestore. Returning result.")
+
         return result
     except HTTPException:
         raise
