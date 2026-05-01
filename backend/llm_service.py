@@ -6,6 +6,40 @@ from openai import OpenAI
 # We set this up securely in the backend so it's not exposed to the Flutter app.
 client = OpenAI()
 
+LOW_DATA_SYSTEM_PROMPT = """
+You are a surf coach reviewing a session with ZERO reflection data.
+The user provided a Focus Skill but did not describe what happened.
+
+YOUR GOAL:
+Provide a helpful awareness cue and a simple experiment based ONLY on the chosen Focus Skill.
+
+STRICT RULES:
+- Do NOT diagnose. You have no evidence.
+- Do NOT say "it seems like", "I noticed", or "the pop-up is occurring".
+- Do NOT mention falling, slipping, instability, tilted surfaces, or balance unless the user mentioned them.
+- Do NOT use any diagnostic or definitive language.
+- Frame everything as "one thing to watch" or "an experiment".
+
+FIELD MAPPING (STRICT STYLE):
+
+session_insight:
+"Since you chose [Focus Skill], one thing to watch next session is whether you’re [Scenario A] or [Scenario B]."
+Example: "Since you chose pop-up timing, one thing to watch next session is whether you’re getting to your feet while the board still feels lifted, or after it starts to tip forward."
+
+progress_pattern:
+A general statement about how that skill feels to track.
+Example: "Timing can be hard to feel at first, so noticing when you stand up is the main pattern to track."
+
+next_session_focus:
+A simple experiment to try next session.
+Example: "Try popping up a touch earlier and notice whether the board feels more stable underneath you."
+
+OUTPUT FORMAT:
+Return a valid JSON object with exactly these keys:
+- "session_insight_en", "progress_pattern_en", "next_session_focus_en", "focus_tag_en"
+- "session_insight_es", "progress_pattern_es", "next_session_focus_es", "focus_tag_es"
+"""
+
 SYSTEM_PROMPT = """
 You are a surf coach analyzing one session.
 
@@ -210,15 +244,25 @@ DATA_RICHNESS is {data_richness}. Adjust certainty accordingly. Do not invent de
 Write the response now. Follow all tone and structure rules.
     """.strip()
 
+    # Hard conditional for LOW-DATA MODE
+    active_prompt = SYSTEM_PROMPT
+    is_low_data = False
+    
+    # If both main reflection fields are missing, force LOW-DATA prompt
+    if (not felt_good or not felt_good.strip()) and (not felt_hard or not felt_hard.strip()):
+        active_prompt = LOW_DATA_SYSTEM_PROMPT
+        is_low_data = True
+        print("[DataAudit] HARD CONDITIONAL: Using LOW_DATA_SYSTEM_PROMPT")
+
     import hashlib
-    prompt_hash = hashlib.md5(SYSTEM_PROMPT.encode()).hexdigest()[:8]
+    prompt_hash = hashlib.md5(active_prompt.encode()).hexdigest()[:8]
 
     print("\n" + "="*60)
     print("SMART SURF — PROMPT SENT TO OPENAI")
     print("="*60)
-    print(f"MODEL: gpt-4o-mini | TEMPERATURE: 0.4 | PROMPT HASH: {prompt_hash}")
+    print(f"MODEL: gpt-4o-mini | TEMPERATURE: 0.4 | PROMPT HASH: {prompt_hash} | LOW_DATA: {is_low_data}")
     print("-"*60)
-    print("SYSTEM PROMPT:\n", SYSTEM_PROMPT.strip())
+    print("ACTIVE SYSTEM PROMPT:\n", active_prompt.strip())
     print("-"*60)
     print("USER MESSAGE:\n", user_content)
     print("="*60 + "\n")
@@ -226,7 +270,7 @@ Write the response now. Follow all tone and structure rules.
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT.strip()},
+            {"role": "system", "content": active_prompt.strip()},
             {"role": "user", "content": user_content}
         ],
         response_format={"type": "json_object"},
@@ -276,4 +320,3 @@ Write the response now. Follow all tone and structure rules.
     except Exception as e:
         print(f"PARSE FAILED — unexpected error: {e}. Raw content: {raw_content!r}")
         return FALLBACK
-
