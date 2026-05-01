@@ -160,7 +160,37 @@ def health_check():
     return {
         "status": "ok",
         "service": "Smart Surf Pop-up Analyzer",
-        "deploy": "2364c85",
+        "deploy": "594f965",
+    }
+
+@app.get("/api/firebase_status")
+def firebase_status():
+    """Public diagnostic endpoint — no auth required.
+    Shows whether Firebase Admin is correctly initialized for token verification."""
+    env_var_set = bool(os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON"))
+    project_id = None
+    if env_var_set:
+        try:
+            cred_dict = json.loads(os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON"))
+            project_id = cred_dict.get("project_id", "parse_failed")
+        except Exception:
+            project_id = "json_parse_error"
+
+    return {
+        "firebase_init_source": _firebase_init_source,
+        "env_var_FIREBASE_SERVICE_ACCOUNT_JSON_set": env_var_set,
+        "project_id_from_env_var": project_id,
+        "firestore_client_ready": db is not None,
+        "token_verification_will_work": _firebase_init_source in (
+            "env_var:FIREBASE_SERVICE_ACCOUNT_JSON",
+            "local_file:service-account.json",
+        ),
+        "fix_needed": _firebase_init_source == "default_credentials",
+        "fix_instructions": (
+            "Set FIREBASE_SERVICE_ACCOUNT_JSON in Render environment variables "
+            "with the full contents of your service-account.json file."
+            if _firebase_init_source == "default_credentials" else None
+        ),
     }
 
 @app.get("/api/debug_prompt")
