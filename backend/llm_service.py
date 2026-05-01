@@ -112,32 +112,36 @@ You MUST match your certainty level to the data richness. This is not optional.
 
 THIN (few or no reflection answers provided):
 - Do NOT make specific mechanical claims. You have no evidence for them.
-- Do NOT repeat the same idea across session_insight, progress_pattern, and next_session_focus.
+- Do NOT repeat the same phrase or idea across session_insight, progress_pattern, and next_session_focus.
+  If a phrase appears in one field, do not use it again — not even reworded.
 - Do NOT use: "If the focus was…" — the focus area is already known. Do not restate it.
-- Each field must add a NEW layer of information:
+- Each field must add a NEW layer. Three fields = three different ideas.
 
-  session_insight → WHAT TO NOTICE (one specific thing to observe during the session)
-    State the physical thing to pay attention to. Not a diagnosis — an observation target.
-    Use: "A useful thing to watch is whether…", "Pay attention to…", "Notice whether…"
+  session_insight → WHAT TO NOTICE (an awareness cue — one physical sensation to watch for)
+    Use sensory language the surfer can feel in the water.
+    Good sensory cues: "board rising beneath you", "tipping forward at takeoff",
+    "losing balance right after standing", "wave pushing the tail", "board going flat under your feet"
+    Use: "Notice whether…", "Pay attention to whether…", "Watch for the moment…"
 
-  progress_pattern → WHAT THAT USUALLY LEADS TO (consequence if the pattern is present)
-    State what typically happens mechanically when this issue exists at this skill level.
-    This is a general pattern — not a claim about this specific session.
-    Use: "When this happens…", "At this stage…", "This often results in…"
+  progress_pattern → WHAT THAT USUALLY CAUSES (the downstream consequence)
+    State what typically happens at this skill level when this pattern is present.
+    Must be a different idea from session_insight — not a restatement of it.
+    Use: "When this happens…", "At this stage…", "This often leads to…"
 
-  next_session_focus → WHAT TO TRY (one concrete action to take next session)
-    A specific physical cue or timing instruction. Testable. Not a category.
-    Use: "Next session, try…", "Focus on…", "Before you pop up…"
+  next_session_focus → WHAT TO TRY (one physical adjustment — testable next session)
+    Must be a concrete action, not a category. Something the surfer can actually do differently.
+    Must be a different idea from both previous fields — a forward action, not a recap.
+    Use: "Next session, try…", "Before standing up…", "As the board starts to move…"
 
-THIN EXAMPLE — CORRECT (each section adds something new):
-  session_insight: "Pay attention to whether you're standing up before or after you feel the wave push the tail of the board."
-  progress_pattern: "At this stage, popping up a moment too late usually means landing on a steeper face — the board has less momentum and balance is harder to hold."
-  next_session_focus: "Next session, try to stand up while you still feel the wave lifting the tail — not after the board has already started to drop."
+THIN EXAMPLE — CORRECT:
+  session_insight: "Notice whether the board feels like it's still rising when you stand, or whether it's already started to flatten out beneath you."
+  progress_pattern: "When the board is already dropping before the pop-up, landing weight tends to shift toward the tail — which makes the board slide sideways instead of tracking forward."
+  next_session_focus: "Try standing up the moment you feel the board accelerate forward — before the nose dips."
 
-THIN EXAMPLE — WRONG (same idea repeated three times):
-  session_insight: "Since the focus was pop-up timing, pay attention to your timing."
-  progress_pattern: "Timing is important at this stage — keep working on your pop-up timing."
-  next_session_focus: "Focus on improving your timing next session."
+THIN EXAMPLE — WRONG (same idea repeated, no sensory cues):
+  session_insight: "Pay attention to your pop-up timing."
+  progress_pattern: "Pop-up timing is important at this stage."
+  next_session_focus: "Work on your pop-up timing next session."
 
 
 MODERATE (some reflection answers provided, but sparse):
