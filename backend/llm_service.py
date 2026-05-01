@@ -105,6 +105,30 @@ OUTPUT LENGTH
 - focus_tag: 3 words maximum (e.g. "takeoff timing", "paddle entry", "weight distribution")
 
 ════════════════════════════════════════
+DATA RICHNESS — ADJUST CERTAINTY TO MATCH INPUT
+════════════════════════════════════════
+The user message will include a DATA_RICHNESS label: THIN, MODERATE, or RICH.
+You MUST match your certainty level to the data richness. This is not optional.
+
+THIN (few or no reflection answers provided):
+- Do NOT make specific mechanical claims. You have no evidence for them.
+- Do NOT say: "your pop-up is happening after the face steepens" — you don't know this.
+- Frame everything as a likely pattern based on the focus skill chosen.
+- Use: "A likely focus here is…", "This may be happening if…", "Next session, pay attention to whether…"
+- Example: "Since the focus was pop-up timing, a useful thing to watch next session is whether you're
+  standing up before or after the wave starts to steepen."
+
+MODERATE (some reflection answers provided, but sparse):
+- You can reference what the user mentioned, but hedge on cause.
+- Use: "Based on what you described…", "If that's the pattern…", "One thing to check is…"
+- Do not invent details not present in the input.
+
+RICH (detailed reflection answers — what felt hard, specific observations):
+- You can make specific mechanical observations tied directly to what the user described.
+- You can use direct language: "The pop-up is happening after the face steepens…"
+- Still do not invent — only state what the input supports.
+
+════════════════════════════════════════
 OUTPUT FORMAT
 ════════════════════════════════════════
 Return a valid JSON object with exactly these keys:
@@ -127,18 +151,31 @@ def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: s
             for s in history[:3]
         ]) + "\n\n"
 
-    user_content = f"""
-{history_text}Here's what happened in the session:
-- Focus area: {focus}
-- Wave height: {wave_height}
-- Board: {board}
-- Conditions: {conditions}
-- What felt good: {felt_good}
-- What felt tricky: {felt_hard}
-- What they were working on: {worked_on}
-- Notes: {notes}
+    # Compute data richness so the model knows how certain it can be
+    reflection_fields = [felt_good, felt_hard, worked_on, notes, conditions]
+    filled = sum(1 for f in reflection_fields if f and f.strip())
+    if filled == 0:
+        data_richness = "THIN"
+    elif filled <= 2:
+        data_richness = "MODERATE"
+    else:
+        data_richness = "RICH"
 
-Write the response now. Follow the tone rules exactly: calm, grounded, no slang, no hype.
+    user_content = f"""
+{history_text}DATA_RICHNESS: {data_richness}
+
+Session details:
+- Focus area: {focus or 'not specified'}
+- Wave height: {wave_height or 'not specified'}
+- Board: {board or 'not specified'}
+- Conditions: {conditions or '[not provided]'}
+- What felt good: {felt_good or '[not provided]'}
+- What felt tricky: {felt_hard or '[not provided]'}
+- What they were working on: {worked_on or '[not provided]'}
+- Notes: {notes or '[not provided]'}
+
+DATA_RICHNESS is {data_richness}. Adjust certainty accordingly. Do not invent details not present above.
+Write the response now. Follow all tone and structure rules.
     """.strip()
 
     import hashlib
