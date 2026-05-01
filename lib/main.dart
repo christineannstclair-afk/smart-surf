@@ -485,7 +485,8 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
     
     // Most recent completed session
     final lastSession = _sessionLogs.firstWhere((e) => e.isCompleted, orElse: () => _sessionLogs.first);
-    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+    // forceRefresh:true ensures we never send a stale cached token (avoids 401)
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken(true);
     if (idToken == null) return null;
 
     try {
@@ -526,11 +527,13 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
 
   Future<SessionLogEntry?> _generateInsight(SessionLogEntry session) async {
     debugPrint("🤖 AI Insight: Request started for session ${session.id}");
-    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+    // forceRefresh:true ensures we never send a stale cached token (avoids 401)
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken(true);
     if (idToken == null) {
-      debugPrint("🤖 AI Insight: Error - No ID token available");
+      debugPrint("🤖 AI Insight: Error - No ID token available (user not signed in)");
       return null;
     }
+    debugPrint("🤖 AI Insight: Token fetched — starts with: ${idToken.substring(0, 20)}...");
 
     try {
       debugPrint("🤖 AI Insight: Calling AnalyzeApi.analyzeReflection with waveSize: ${session.waveSize}, board: ${session.board}...");
