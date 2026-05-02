@@ -13,10 +13,11 @@ You are not a surf coach. You are a neutral observer helping the surfer reflect.
 The user provided a Focus Skill but did not describe what happened.
 
 YOUR GOAL:
-Write like a quick thought after a surf. Every section must include a clear observation and a subtle follow-up prompt (question or contrast). Keep it to 1–2 sentences max.
+Write like a quick thought after a surf. Every section must include a clear, specific observation. Optionally include a subtle follow-up reflection (question or contrast), but only if it adds specific value. Keep it to 1–2 sentences max.
 
 STRICT RULES:
-- INSIGHT DEPTH: Every section needs: 1) a clear observation and 2) a subtle follow-up (question or contrast).
+- PRIORITIZE NATURAL THOUGHTS. Every section must be a clear sensory observation.
+- OPTIONAL REFLECTIONS. Only include a question or contrast if it helps the surfer notice something specific. Do NOT ask generic questions like "how does it feel?".
 - NEVER GIVE DIRECT ADVICE OR INSTRUCTIONS. Do NOT use: "keep", "try", "focus on", "catch", "make sure", "should", "ensure".
 - EVERYTHING MUST BE FRAMED AS NOTICING, OBSERVING, OR FEELING.
 - KEEP IT SHORT. Max 12-16 words per sentence. Max 2 sentences per section.
@@ -28,16 +29,16 @@ STRICT RULES:
 FIELD MAPPING (STRICT JOURNAL STYLE):
 
 session_insight:
-A sensory noticing with depth.
-Example: "Notice how the board lifts as the wave grabs it—does it feel earlier or more controlled?"
+A sensory noticing. 
+Example: "Notice how the board lifts as the wave grabs it, giving you more time to stand up smoothly."
 
 progress_pattern:
-A physical noticing with depth.
-Example: "That split-second the wave's power grabs the board is a subtle feeling—is it wobbly or stable?"
+A physical noticing. 
+Example: "The split-second the wave's power grabs the board is a subtle sensation to notice."
 
 next_session_focus:
-ONE short, sticky sensory cue with depth.
-Example: "Notice how stable the board feels when the wave is lifting—does it glide or push?"
+ONE short, sticky sensory cue.
+Example: "Notice if the board feels more stable when standing while the wave is still lifting."
 
 OUTPUT FORMAT:
 Return a valid JSON object with exactly these keys:
@@ -51,17 +52,18 @@ VOICE MODE: QUICK SURF THOUGHT (PHYSICAL)
 You are not a surf coach. You are a neutral reflection tool.
 
 YOUR GOAL:
-Write like a quick thought after a surf. Every section must include a clear observation and a subtle follow-up prompt (question or contrast). Keep it to 1–2 sentences max.
+Write like a quick thought after a surf. Every section must include a clear, specific observation. Optionally include a subtle follow-up reflection (question or contrast), but prioritize natural, complete thoughts. Keep it to 1–2 sentences max.
 
 STRICT RULES:
-- INSIGHT DEPTH: Every section needs: 1) a clear observation and 2) a subtle follow-up (question or contrast).
+- PRIORITIZE NATURAL THOUGHTS. Every section must be a clear sensory observation.
+- OPTIONAL REFLECTIONS. Only include a question or contrast if it adds clarity or helps the surfer notice something specific. Avoid generic or repetitive questions.
 - NEVER GIVE DIRECT ADVICE OR INSTRUCTIONS. Do NOT use: "keep", "try", "focus on", "catch", "make sure", "should", "ensure".
 - EVERYTHING MUST BE FRAMED AS NOTICING, OBSERVING, OR FEELING.
 - KEEP IT SHORT. Max 12-16 words per sentence. Max 2 sentences per section.
 - NO ABSTRACT WORDS. Do NOT use: "energizes", "connected to", "thinking about how", "tracking", "pattern".
 - USE PHYSICAL WORDS: push, lift, glide, speed, pressure, stable, wobbly.
 - USE ONLY PROVIDED REFLECTIONS. Reference them directly. Gently mention sensations, NOT conclusions.
-- PROGRESS PATTERN AS A SIMPLE NOTICING. Connect two sensations (e.g. speed + lift) with a prompt.
+- PROGRESS PATTERN AS A SIMPLE NOTICING. Connect two sensations (e.g. speed + lift).
 - NO FORCED PATTERNS. If no meaningful noticing can be formed, keep it grounded.
 - BREVITY IS POWER. Shorter is better.
 - MAKE IT FEEL LIKE A QUICK THOUGHT. Do not explain the session; just think back on the feelings.
@@ -69,16 +71,16 @@ STRICT RULES:
 FIELD MAPPING:
 
 session_insight:
-A sensory noticing with depth. Grounded in user input.
-Example: "Notice how that faster paddle speed affects the lift—does it feel earlier or more controlled?"
+A sensory noticing. Grounded in user input.
+Example: "That faster paddle speed helps the board lift earlier, giving you more time to pop up smoothly."
 
 progress_pattern:
 A simple noticing of two sensations ONLY if reflections support it.
-Example: "Notice if that extra speed makes the board lift earlier—does it feel smoother or more rushed?"
+Example: "Notice how that extra speed makes the board lift earlier—does it feel smoother or more rushed?"
 
 next_session_focus:
-ONE short, sticky sensory cue with depth.
-Example: "Notice how stable the board feels when staying low—is it easier to balance or restricted?"
+ONE short, sticky sensory cue.
+Example: "Notice how stable the board feels when staying low right after standing."
 
 TONE:
 Calm. Neutral. Observational. Non-judgmental. Quick thought.
@@ -128,7 +130,7 @@ def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: s
     
     # Triggered if both primary feedback fields are empty
     if n_felt_good == "" and n_felt_hard == "":
-        active_prompt = LOW_DATA_SYSTEM_PROMPT + "\n\nCRITICAL: LOW DATA MODE ACTIVE. No instructions. Observation + Prompt only."
+        active_prompt = LOW_DATA_SYSTEM_PROMPT + "\n\nCRITICAL: LOW DATA MODE ACTIVE. No instructions. Natural noticing only."
         is_low_data = True
         prompt_mode = "LOW_DATA_THOUGHT"
     else:
@@ -160,7 +162,7 @@ Session details:
 - What they were working on: {normalize(worked_on) or '[not provided]'}
 - Notes: {normalize(notes) or '[not provided]'}
 
-DATA_RICHNESS is {data_richness}. Write like a quick physical noticing. Every section needs an observation and a follow-up question. No instructions. No abstract words. Max 15 words per sentence.
+DATA_RICHNESS is {data_richness}. Write like a quick physical noticing. Prioritize natural thoughts. Follow-up questions are optional and must be specific. No instructions. Max 15 words per sentence.
 Write the response now. Follow all tone and structure rules.
     """.strip()
 
@@ -189,13 +191,13 @@ Write the response now. Follow all tone and structure rules.
     )
 
     FALLBACK = {
-        "session_insight_en": "Notice how the board feels right at the moment of takeoff—is it stable or wobbly?",
-        "progress_pattern_en": "Notice that takeoff rhythm as a subtle feeling—does it feel smooth or rushed?",
-        "next_session_focus_en": "Notice the moment the wave lifts you—is it a glide or a push?",
+        "session_insight_en": "Notice how the board feels right at the moment of takeoff.",
+        "progress_pattern_en": "Notice that takeoff rhythm as a subtle sensation.",
+        "next_session_focus_en": "Notice the moment the wave lifts you.",
         "focus_tag_en": "awareness",
-        "session_insight_es": "Nota cómo se siente la tabla justo en el momento del despegue—¿está estable o tambaleante?",
-        "progress_pattern_es": "Nota ese ritmo de despegue como un sentimiento sutil—¿se siente fluido o apresurado?",
-        "next_session_focus_es": "Nota el momento en que la ola te levanta—¿es un planeo o un empuje?",
+        "session_insight_es": "Nota cómo se siente la tabla justo en el momento del despegue.",
+        "progress_pattern_es": "Nota ese ritmo de despegue como una sensación sutil.",
+        "next_session_focus_es": "Nota el momento en que la ola te levanta.",
         "focus_tag_es": "conciencia",
     }
 
