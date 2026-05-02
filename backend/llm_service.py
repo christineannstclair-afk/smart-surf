@@ -16,6 +16,9 @@ YOUR GOAL:
 Write like a quick thought after a surf. Every sentence must relate to a physical sensation (push, lift, glide, speed, pressure, stable, wobbly).
 
 STRICT RULES:
+- NEVER GIVE DIRECT ADVICE OR INSTRUCTIONS. Do NOT use: "keep", "try", "focus on", "catch", "make sure", "should", "ensure".
+- EVERYTHING MUST BE FRAMED AS NOTICING, OBSERVING, OR FEELING. 
+- IF A SENTENCE SOUNDS LIKE COACHING, CONVERT IT TO A NOTICING STATEMENT.
 - KEEP IT SHORT. Max 12-16 words per sentence.
 - NO ABSTRACT WORDS. Do NOT use: "energizes", "connected to", "thinking about how", "tracking", "pattern".
 - USE PHYSICAL WORDS: push, lift, glide, speed, pressure, stable, wobbly.
@@ -28,16 +31,16 @@ STRICT RULES:
 FIELD MAPPING (STRICT JOURNAL STYLE):
 
 session_insight:
-A quick sensory moment. 
+A quick sensory noticing. 
 Example: "Notice the sensation of the board lifting just before you stand up."
 
 progress_pattern:
-A simple noticing. 
+A simple physical noticing. 
 Example: "That split-second the wave's power grabs the board is a subtle feeling."
 
 next_session_focus:
-ONE short, sticky sensory cue.
-Example: "Pop up a touch earlier and notice how stable the board feels."
+ONE short, sticky sensory cue framed as noticing.
+Example: "Notice how stable the board feels when standing while the wave is still lifting."
 
 OUTPUT FORMAT:
 Return a valid JSON object with exactly these keys:
@@ -54,6 +57,9 @@ YOUR GOAL:
 Write like a quick thought after a surf. Every sentence must relate to a physical sensation (push, lift, glide, speed, pressure, stable, wobbly).
 
 STRICT RULES:
+- NEVER GIVE DIRECT ADVICE OR INSTRUCTIONS. Do NOT use: "keep", "try", "focus on", "catch", "make sure", "should", "ensure".
+- EVERYTHING MUST BE FRAMED AS NOTICING, OBSERVING, OR FEELING.
+- IF A SENTENCE SOUNDS LIKE COACHING, CONVERT IT TO A NOTICING STATEMENT.
 - KEEP IT SHORT. Max 12-16 words per sentence.
 - NO ABSTRACT WORDS. Do NOT use: "energizes", "connected to", "thinking about how", "tracking", "pattern".
 - USE PHYSICAL WORDS: push, lift, glide, speed, pressure, stable, wobbly.
@@ -67,16 +73,16 @@ STRICT RULES:
 FIELD MAPPING:
 
 session_insight:
-A sensory moment. Grounded in user input.
-Example: "That faster paddle speed might help you stand a bit sooner."
+A sensory noticing. Grounded in user input.
+Example: "Notice how that faster paddle speed affects when the board starts to lift."
 
 progress_pattern:
 A simple noticing of two sensations ONLY if reflections support it.
 Example: "Notice if that extra speed makes the board lift earlier."
 
 next_session_focus:
-ONE short, sticky sensory cue.
-Example: "Stay low for an extra second and notice how stable the board feels."
+ONE short, sticky sensory cue framed as noticing.
+Example: "Notice how stable the board feels when staying low for an extra second."
 
 TONE:
 Calm. Neutral. Observational. Non-judgmental. Quick thought.
@@ -126,7 +132,7 @@ def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: s
     
     # Triggered if both primary feedback fields are empty
     if n_felt_good == "" and n_felt_hard == "":
-        active_prompt = LOW_DATA_SYSTEM_PROMPT + "\n\nCRITICAL: LOW DATA MODE ACTIVE. Short physical thoughts only. No abstract words."
+        active_prompt = LOW_DATA_SYSTEM_PROMPT + "\n\nCRITICAL: LOW DATA MODE ACTIVE. No instructions. Noticing only."
         is_low_data = True
         prompt_mode = "LOW_DATA_THOUGHT"
     else:
@@ -158,7 +164,7 @@ Session details:
 - What they were working on: {normalize(worked_on) or '[not provided]'}
 - Notes: {normalize(notes) or '[not provided]'}
 
-DATA_RICHNESS is {data_richness}. Write like a quick physical thought. Max 15 words per sentence. No abstract words. No diagnose. Use only provided facts.
+DATA_RICHNESS is {data_richness}. Write like a quick physical noticing. No instructions. Max 15 words per sentence. No abstract words. No diagnose. Use only provided facts.
 Write the response now. Follow all tone and structure rules.
     """.strip()
 
@@ -188,12 +194,12 @@ Write the response now. Follow all tone and structure rules.
 
     FALLBACK = {
         "session_insight_en": "Notice how the board feels right at the moment of takeoff.",
-        "progress_pattern_en": "That takeoff rhythm is a subtle feeling to watch.",
-        "next_session_focus_en": "Feel the moment the wave lifts you.",
+        "progress_pattern_en": "Notice that takeoff rhythm as a subtle feeling.",
+        "next_session_focus_en": "Notice the moment the wave lifts you.",
         "focus_tag_en": "awareness",
         "session_insight_es": "Nota cómo se siente la tabla justo en el momento del despegue.",
-        "progress_pattern_es": "Ese ritmo de despegue es un sentimiento sutil para observar.",
-        "next_session_focus_es": "Siente el momento en que la ola te levanta.",
+        "progress_pattern_es": "Nota ese ritmo de despegue como un sentimiento sutil.",
+        "next_session_focus_es": "Nota el momento en que la ola te levanta.",
         "focus_tag_es": "conciencia",
     }
 
