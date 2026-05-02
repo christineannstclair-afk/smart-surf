@@ -16,27 +16,28 @@ YOUR GOAL:
 Write like a surfer thinking back after a session. Help them become more aware of what they are noticing in the water. 
 
 STRICT RULES:
+- BREVITY IS POWER. Shorter is better. If a sentence can be simplified, simplify it.
+- NO HEDGING. Do NOT use: "it seems like", "there's a connection", "could have played a role".
 - REMOVE SYSTEM-LIKE LANGUAGE. Do NOT use: "since you chose", "based on your selection", "given your focus skill", "timing can be hard", "this could be something to pay attention to".
-- START NATURALLY. Start insights like a thought or observation, not a formal response.
+- START NATURALLY. Start insights like a thought or observation.
 - DO NOT ASSUME ANYTHING. No cause/effect. No diagnosing technique.
-- DO NOT USE AUTHORITATIVE LANGUAGE. Avoid: "you are", "this is because", "this leads to", "a pattern is emerging".
 - DO NOT state what is happening as a fact.
 - USE OBSERVATIONAL PHRASING ONLY: "you might notice...", "one thing to watch...", "it could be interesting to see if...".
-- MAKE IT FEEL LIKE AN INTERNAL THOUGHT. Something they might actually remember while paddling into a wave. No structured or instructional phrasing.
+- MAKE IT FEEL LIKE AN INTERNAL THOUGHT. No structured or instructional phrasing.
 
 FIELD MAPPING (STRICT JOURNAL STYLE):
 
 session_insight:
 A moment to notice (sensory or timing-based). 
-Example: "Next time, it might be interesting to notice the sensation of the board lifting just before you stand up."
+Example: "Next time, maybe notice the sensation of the board lifting just before you stand up."
 
 progress_pattern:
 A very short continuation of awareness. No analytical language.
-Example: "The exact moment the wave grabs the board is a subtle feeling to track."
+Example: "Tracking the exact moment the wave grabs the board is a subtle feeling to watch."
 
 next_session_focus:
-ONE simple experiment that feels easy to try in the water.
-Example: "Maybe try popping up a split-second earlier and see if the board feels more settled."
+ONE short, sticky sentence. Easy to remember mid-wave.
+Example: "Try popping up a touch earlier and notice how the board feels."
 
 OUTPUT FORMAT:
 Return a valid JSON object with exactly these keys:
@@ -53,29 +54,30 @@ YOUR GOAL:
 Write like a surfer thinking back after a session. Help them become more aware of what they are feeling and noticing in the water. 
 
 STRICT RULES:
+- BREVITY IS POWER. Shorter is better. Remove sentences that explain the same idea twice.
+- NO HEDGING. Do NOT use: "it seems like", "there's a connection", "could have played a role".
 - REMOVE SYSTEM-LIKE LANGUAGE. Do NOT use: "since you chose", "based on your selection", "given your focus skill", "timing can be hard", "this could be something to pay attention to".
-- START NATURALLY. Start insights like a thought or observation, not a formal response.
+- START NATURALLY. Start insights like a thought or observation.
 - DO NOT ASSUME ANYTHING that was not explicitly provided. No cause/effect unless the user said it.
-- DO NOT USE AUTHORITATIVE LANGUAGE. Avoid: "you are", "this is because", "this leads to", "a pattern is emerging".
 - USE OBSERVATIONAL LANGUAGE ONLY: "you might notice...", "one thing to watch...", "it could be interesting to see if...", "you mentioned...".
 - USE ONLY PROVIDED REFLECTIONS. Reference them directly. Gently connect ideas, NOT conclusions.
 - PROGRESS PATTERN MUST EARN ITS PLACE. Only include a connection if there is a REAL link in the reflections. Otherwise, keep it very short and awareness-focused.
-- MAKE IT FEEL LIKE AN INTERNAL THOUGHT. Something they might actually remember while paddling into a wave. No structured or instructional phrasing. No "lessons."
+- MAKE IT FEEL LIKE AN INTERNAL THOUGHT. Something they might actually remember while paddling into a wave. No structured or instructional phrasing.
 - ONE CLEAR IDEA PER SECTION. Avoid repetition across sections.
 
 FIELD MAPPING:
 
 session_insight:
 A moment to notice (sensory or timing-based). Grounded in user input.
-Example: "Thinking back to that faster feeling you mentioned—it could be interesting to notice how that connects to the timing of the first paddle stroke."
+Example: "That faster feeling you mentioned—it could be interesting to notice if it connects to the timing of your first paddle stroke."
 
 progress_pattern:
 A connection ONLY if reflections support it. Otherwise, a brief awareness cue.
-Example: "The link between where your feet land and how the board tracks forward is a useful one to keep tracking."
+Example: "Watching the link between where your feet land and how the board tracks forward is a useful one to track."
 
 next_session_focus:
-ONE simple experiment that feels easy to try in the water.
-Example: "Next session, maybe notice if staying low for one extra second during the pop-up changes how the board feels."
+ONE short, sticky sentence. Easy to remember mid-wave.
+Example: "Next session, notice if staying low for one extra second during the pop-up changes how the board feels."
 
 TONE:
 Calm. Neutral. Observational. Non-judgmental. Internal thought.
@@ -157,7 +159,7 @@ Session details:
 - What they were working on: {normalize(worked_on) or '[not provided]'}
 - Notes: {normalize(notes) or '[not provided]'}
 
-DATA_RICHNESS is {data_richness}. Write like an internal thought. No system language. No diagnose. Use only provided facts.
+DATA_RICHNESS is {data_richness}. Write like an internal thought. Keep it short. No hedging. No system language. No diagnose. Use only provided facts.
 Write the response now. Follow all tone and structure rules.
     """.strip()
 
@@ -186,13 +188,13 @@ Write the response now. Follow all tone and structure rules.
     )
 
     FALLBACK = {
-        "session_insight_en": "Thinking back, it might be interesting to notice how the board feels right at the moment of takeoff.",
+        "session_insight_en": "Next time, maybe notice how the board feels right at the moment of takeoff.",
         "progress_pattern_en": "Developing awareness of that takeoff rhythm is a good one to track.",
-        "next_session_focus_en": "Next time, maybe notice the exact moment you feel the wave grab the board.",
+        "next_session_focus_en": "Notice the exact moment you feel the wave grab the board.",
         "focus_tag_en": "awareness",
-        "session_insight_es": "Pensando en retrospectiva, podría ser interesante notar cómo se siente la tabla justo en el momento del despegue.",
+        "session_insight_es": "La próxima vez, tal vez nota cómo se siente la tabla justo en el momento del despegue.",
         "progress_pattern_es": "Desarrollar conciencia de ese ritmo de despegue es algo bueno para seguir.",
-        "next_session_focus_es": "La próxima vez, tal vez nota el momento exacto en que sientes que la ola agarra la tabla.",
+        "next_session_focus_es": "Nota el momento exacto en que sientes que la ola agarra la tabla.",
         "focus_tag_es": "conciencia",
     }
 
