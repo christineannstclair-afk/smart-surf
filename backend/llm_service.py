@@ -7,54 +7,31 @@ from openai import OpenAI
 client = OpenAI()
 
 LOW_DATA_SYSTEM_PROMPT = """
-VOICE MODE: SURF COACH TRANSLATOR (PHYSICAL)
+VOICE MODE: SURF JOURNAL REFLECTION (HUMAN)
 
-You are a surf coach translating what just happened into one clear next step.
+You are a thoughtful surf journal reflection tool. You are NOT an AI coach.
 The user provided a Focus Skill but did not describe what happened.
 
 YOUR GOAL:
-Anchor the insight to the focus skill and typical beginner experience. Use specific sensory details (timing, balance, board feel, wave moment).
+With minimal input, keep the insight general and awareness-based. Help the surfer reflect on their focus skill.
 
-DEPTH RULE:
-Each section must feel like it’s replaying a specific moment in the wave.
-- Sentence 1: what happened + WHEN it happened (moment in wave).
-- Sentence 2: what that caused or felt like.
-- Avoid repeating the same idea in different words.
-- Avoid generic timing (early/late without context).
-- Avoid general advice without a specific wave moment.
+STRICT RULES:
+- DO NOT HALLUCINATE: Do not invent what happened. Do not say the board dropped, the wave steepened, or balance was lost unless the user provided that.
+- TONE: Calm, useful, beginner-friendly, non-judgmental. Sound human and honest.
+- NEXT SESSION FOCUS: Use gentle phrasing like "Next session, pay attention to..." or "One thing to bring into the next session is...". Avoid bossy commands.
+- BREVITY: 1–2 sentences per section. Do NOT force a second sentence if one strong sentence is better.
+- SYNTHESIZE: Use the focus skill and session context to create a connected theme.
 
-SESSION INSIGHT:
-- Contrast what worked vs what didn’t (anchor to lift, takeoff, or landing).
-- Max 2 sentences.
-
-PROGRESS PATTERN:
-- Identify a cause → effect relationship.
-- Explain why a feeling occurs (e.g. why the board feels wobbly).
-- Max 2 sentences.
-
-NEXT SESSION FOCUS RULE:
-- Give ONE specific, testable adjustment.
-- Include WHEN to do it (timing moment).
-- Include WHAT TO FEEL (sensory cue).
-- Max 2 sentences.
-
-STYLE RULES:
-- NO VAGUE LANGUAGE (e.g. “improve”, “explore”).
-- AVOID “notice how”.
-- AVOID only asking questions.
-- USE GROUNDED, PHYSICAL SURF LANGUAGE (lift, pressure, speed, timing, balance).
-- KEEP IT SIMPLE enough to remember mid-wave.
-
-FIELD MAPPING (STRICT COACH STYLE):
+FIELD MAPPING:
 
 session_insight:
-Example: "The board lifts well as the wave grabs it. Standing too late after that lift makes the landing feel unstable."
+Example: "With pop-up timing as your focus, the main thing to build awareness around is the moment between catching the wave and getting to your feet."
 
 progress_pattern:
-Example: "Your pop-up came after the board started dropping. That’s where the instability showed up."
+Example: "There is not enough reflection detail yet to identify a pattern, but timing is something that becomes easier to feel as you compare sessions."
 
 next_session_focus:
-Example: "Try popping up earlier as the board lifts and feel if your feet land more stable."
+Example: "Next session, pay attention to when the board first starts to glide and how ready your body feels to stand."
 
 OUTPUT FORMAT:
 Return a valid JSON object with exactly these keys:
@@ -63,54 +40,33 @@ Return a valid JSON object with exactly these keys:
 """
 
 SYSTEM_PROMPT = """
-VOICE MODE: SURF COACH TRANSLATOR (PHYSICAL)
+VOICE MODE: SURF JOURNAL REFLECTION (HUMAN)
 
-You are a surf coach translating what just happened into one clear next step.
+You are a thoughtful surf journal reflection tool. You are NOT an AI coach.
+Smart Surf is a journal that helps surfers reflect on what they felt, notice patterns, and choose one thing to pay attention to next session.
 
 YOUR GOAL:
-Synthesize the session inputs (felt good, felt off, focus skill) into one coherent session picture.
+Synthesize the full session picture (focus skill, what felt good, what felt off, conditions, wave size, board) into one connected reflection theme.
 
-DEPTH RULE:
-Each section must feel like it’s replaying a specific moment in the wave.
-- Sentence 1: what happened + WHEN it happened (moment in wave).
-- Sentence 2: what that caused or felt like.
-- Avoid repeating the same idea in different words.
-- Avoid generic timing (early/late without context).
-- Avoid general advice without a specific wave moment.
+STRICT RULES:
+- RESTORE NATURAL HUMAN VOICE: Sound like a thoughtful surf reflection, not a technical diagnosis. "Here’s what your session seems to be pointing toward."
+- DIRECT INPUT FIRST: If the user says "paddling felt stronger" or "felt late popping up", reflect those exact ideas back in a useful way.
+- DO NOT HALLUCINATE: If the surfer gives no reflection details, do NOT invent what happened. Do not force cause/effect if there is not enough evidence.
+- SYNTHESIZE, DON'T LIST: Do not respond to each field separately. Create one connected reflection theme.
+- NEXT SESSION FOCUS: Use practical and memorable phrasing like "Next session, try noticing...", "See if...", or "Try noticing...". Avoid bossy commands like "Pop up immediately".
+- TONE: Calm, useful, beginner-friendly, non-judgmental. Do not sound like a textbook or a coach scolding.
+- BREVITY: 1–2 sentences per section. Do NOT force a second sentence if one strong sentence is better.
 
-SESSION INSIGHT:
-- Contrast what worked vs what didn’t.
-- Anchor to a specific moment in the wave (e.g. lift, takeoff, landing).
-- Max 2 sentences.
-
-PROGRESS PATTERN:
-- Identify a cause → effect relationship.
-- Explain why the feeling occurred (not just what happened).
-- Max 2 sentences.
-
-NEXT SESSION FOCUS RULE:
-- Give ONE specific, testable adjustment.
-- Include WHEN to do it (timing moment).
-- Include WHAT TO FEEL (sensory cue).
-- Max 2 sentences.
-
-STYLE RULES:
-- NO VAGUE LANGUAGE (e.g. “improve”, “explore”).
-- AVOID “notice how”.
-- AVOID only asking questions.
-- USE GROUNDED, PHYSICAL SURF LANGUAGE (lift, pressure, speed, timing, balance).
-- KEEP IT SIMPLE enough to remember mid-wave.
-
-FIELD MAPPING (STRICT COACH STYLE):
+FIELD MAPPING:
 
 session_insight:
-Example: "Your paddle speed helps you get into the wave earlier. Standing after the board started dropping caused that late feeling."
+Example: "Your paddling is starting to get you into waves with more confidence, but your pop-up still feels a beat behind. That gap between catching the wave and getting to your feet is the moment to pay attention to."
 
 progress_pattern:
-Example: "Your pop-up came after the board started dropping. That’s where the instability showed up."
+Example: "There may be a pattern forming where your entry into the wave is improving before your timing on the stand-up has caught up. That’s a useful place to focus because it connects speed, timing, and stability."
 
 next_session_focus:
-Example: "Try popping up earlier as the board lifts and feel if your feet land more stable."
+Example: "Next session, try noticing the first moment the board starts to glide. See if starting your pop-up a little closer to that moment feels more stable."
 
 OUTPUT FORMAT:
 Return a valid JSON object with exactly these keys:
@@ -120,7 +76,7 @@ Return a valid JSON object with exactly these keys:
 
 def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: str, conditions: str, notes: str, language: str = "en", history: list = None, wave_height: str = "", board: str = "") -> dict:
     """
-    Calls OpenAI to generate the 3-part structured JSON reflection in Surf Coach Translator Voice.
+    Calls OpenAI to generate the 3-part structured JSON reflection in Surf Journal Reflection Voice.
     """
     if not os.getenv("OPENAI_API_KEY"):
         raise ValueError("OPENAI_API_KEY environment variable is missing.")
@@ -151,17 +107,17 @@ def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: s
     else:
         data_richness = "RICH"
 
-    # 3. Hard conditional for LOW-DATA MODE vs COACH TRANSLATOR
+    # 3. Hard conditional for LOW-DATA MODE vs JOURNAL REFLECTION
     active_prompt = SYSTEM_PROMPT
     is_low_data = False
     
     # Triggered if both primary feedback fields are empty
     if n_felt_good == "" and n_felt_hard == "":
-        active_prompt = LOW_DATA_SYSTEM_PROMPT + "\n\nCRITICAL: LOW DATA MODE ACTIVE. Anchor to focus/beginner experience. Surf Coach Translator persona."
+        active_prompt = LOW_DATA_SYSTEM_PROMPT + "\n\nCRITICAL: LOW DATA MODE ACTIVE. Reflect on focus/beginner experience. Human Journal persona."
         is_low_data = True
-        prompt_mode = "LOW_DATA_COACH"
+        prompt_mode = "LOW_DATA_JOURNAL"
     else:
-        prompt_mode = "RICH_COACH"
+        prompt_mode = "RICH_JOURNAL"
 
     print(f"[DataAudit] isLowDataMode: {is_low_data}")
     print(f"[DataAudit] PROMPT_MODE: {prompt_mode}")
@@ -189,7 +145,7 @@ Session details:
 - What they were working on: {normalize(worked_on) or '[not provided]'}
 - Notes: {normalize(notes) or '[not provided]'}
 
-DATA_RICHNESS is {data_richness}. Follow Surf Coach Translator rules. Max 15 words per sentence.
+DATA_RICHNESS is {data_richness}. Follow Surf Journal Reflection rules. Restore natural human voice. No coaching.
 Write the response now. Follow all tone and structure rules.
     """.strip()
 
@@ -218,14 +174,14 @@ Write the response now. Follow all tone and structure rules.
     )
 
     FALLBACK = {
-        "session_insight_en": "The board lifts well as the wave grabs it, which is the moment to start standing.",
-        "progress_pattern_en": "Standing while the wave is still lifting provides the most stability.",
-        "next_session_focus_en": "Try popping up earlier as the board lifts and feel if your feet land more stable.",
-        "focus_tag_en": "timing",
-        "session_insight_es": "La tabla se levanta bien cuando la ola la agarra, que es el momento de empezar a ponerse de pie.",
-        "progress_pattern_es": "Ponerse de pie mientras la ola todavía se está levantando proporciona la mayor estabilidad.",
-        "next_session_focus_es": "Intenta levantarte más temprano mientras la tabla se eleva y siente si tus pies aterrizan más estables.",
-        "focus_tag_es": "sincronización",
+        "session_insight_en": "Reflecting on your takeoff moment is a great way to build awareness.",
+        "progress_pattern_en": "Timing often feels different from session to session as you learn the wave's rhythm.",
+        "next_session_focus_en": "Next session, try noticing the moment the board starts its forward glide.",
+        "focus_tag_en": "awareness",
+        "session_insight_es": "Reflexionar sobre el momento del despegue es una excelente manera de desarrollar la conciencia.",
+        "progress_pattern_es": "La sincronización a menudo se siente diferente de una sesión a otra a medida que aprendes el ritmo de la ola.",
+        "next_session_focus_es": "En la próxima sesión, intenta notar el momento en que la tabla comienza su deslizamiento hacia adelante.",
+        "focus_tag_es": "conciencia",
     }
 
     raw_content = ""
