@@ -27,10 +27,15 @@ STRUCTURE RULE:
 - Avoid repeating the same idea in both sentences.
 - If only one strong sentence exists, do not force a second.
 
+NEXT SESSION FOCUS RULE:
+- Must give ONE clear, testable adjustment.
+- Must describe WHEN to do it (timing moment).
+- Must include a physical/sensory cue (feel, pressure, lift, speed).
+- Frame it as an experiment or "Try" to find a feeling.
+
 STRICT RULES:
 - SYNTHESIZE, DON'T LIST. Create ONE coherent session picture. 
-- NEVER GIVE DIRECT ADVICE OR INSTRUCTIONS. Do NOT use: "keep", "try", "focus on", "catch", "make sure", "should", "ensure".
-- EVERYTHING MUST BE FRAMED AS NOTICING, OBSERVING, OR FEELING.
+- EVERYTHING MUST BE FRAMED AS NOTICING, OBSERVING, OR FEELING (except for the Next Session Focus which is a testable adjustment).
 - KEEP IT SHORT. Max 12-16 words per sentence. 
 - NO ABSTRACT WORDS. Do NOT use: "energizes", "connected to", "thinking about how", "tracking", "pattern".
 - USE PHYSICAL WORDS: push, lift, glide, speed, pressure, stable, wobbly.
@@ -46,7 +51,7 @@ progress_pattern:
 Example: "The board feels most stable when the wave's power is fully underneath you. Notice if that feeling of lift makes standing easier."
 
 next_session_focus:
-Example: "Next session, notice the moment the board starts its forward glide. See if that feeling of speed helps your balance."
+Example: "Try popping up earlier as the board lifts and feel if your feet land more stable."
 
 OUTPUT FORMAT:
 Return a valid JSON object with exactly these keys:
@@ -74,10 +79,15 @@ STRUCTURE RULE:
 - Avoid repeating the same idea in both sentences. Avoid filler or generic extensions.
 - If only one strong sentence exists, do not force a second.
 
+NEXT SESSION FOCUS RULE:
+- Must give ONE clear, testable adjustment.
+- Must describe WHEN to do it (timing moment).
+- Must include a physical/sensory cue (feel, pressure, lift, speed).
+- Frame it as an experiment or "Try" to find a feeling.
+
 STRICT RULES:
 - SYNTHESIZE, DON'T LIST. Avoid piece-y output like "Notice X. Notice Y. Notice Z."
-- NEVER GIVE DIRECT ADVICE OR INSTRUCTIONS. Do NOT use: "keep", "try", "focus on", "catch", "make sure", "should", "ensure".
-- EVERYTHING MUST BE FRAMED AS NOTICING, OBSERVING, OR FEELING.
+- EVERYTHING MUST BE FRAMED AS NOTICING, OBSERVING, OR FEELING (except for the Next Session Focus which is a testable adjustment).
 - KEEP IT SHORT. Max 12-16 words per sentence.
 - NO ABSTRACT WORDS. Do NOT use: "energizes", "connected to", "thinking about how", "tracking", "pattern".
 - USE PHYSICAL WORDS: push, lift, glide, speed, pressure, stable, wobbly.
@@ -94,7 +104,7 @@ progress_pattern:
 Example: "That faster glide from your paddling contrasts with the wobbly feeling of a late pop-up. Noticing that link can help find a more stable rhythm."
 
 next_session_focus:
-Example: "Next session, notice the moment the board starts its glide. See if standing a split-second sooner changes how stable you feel."
+Example: "Try popping up earlier as the board lifts and feel if your feet land more stable."
 
 OUTPUT FORMAT:
 Return a valid JSON object with exactly these keys:
@@ -141,7 +151,7 @@ def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: s
     
     # Triggered if both primary feedback fields are empty
     if n_felt_good == "" and n_felt_hard == "":
-        active_prompt = LOW_DATA_SYSTEM_PROMPT + "\n\nCRITICAL: LOW DATA MODE ACTIVE. Anchor to focus/beginner experience. No instructions."
+        active_prompt = LOW_DATA_SYSTEM_PROMPT + "\n\nCRITICAL: LOW DATA MODE ACTIVE. Anchor to focus/beginner experience. No coaching instructions."
         is_low_data = True
         prompt_mode = "LOW_DATA_THOUGHT"
     else:
@@ -173,7 +183,7 @@ Session details:
 - What they were working on: {normalize(worked_on) or '[not provided]'}
 - Notes: {normalize(notes) or '[not provided]'}
 
-DATA_RICHNESS is {data_richness}. Follow Input Sensitivity and Structure rules. No instructions. Max 15 words per sentence.
+DATA_RICHNESS is {data_richness}. Follow Next Session Focus Rule. No coaching instructions elsewhere. Max 15 words per sentence.
 Write the response now. Follow all tone and structure rules.
     """.strip()
 
