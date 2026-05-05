@@ -4,12 +4,12 @@ import 'app_theme.dart';
 
 /// A unified design for Pro upgrade sheets.
 /// Features rounded top corners, side margins, and a drag handle.
-void showUpgradeBottomSheet({
+Future<T?> showUpgradeBottomSheet<T>({
   required BuildContext context,
   required Widget child,
   bool isSpanish = false,
 }) {
-  showModalBottomSheet(
+  return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

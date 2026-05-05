@@ -615,7 +615,7 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
                 child: FilledButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    _showSurferPro();
+                    openSurferProPaywall(context, source: 'soft_upsell_modal', isSpanish: _isSpanish);
                   },
                   style: FilledButton.styleFrom(
                     backgroundColor: AppTheme.primary,
@@ -784,11 +784,10 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
           aiAnalyses: _aiAnalyses,
           onAddAiAnalysis: _addAiAnalysis,
         );
-      } else if (title != null || content != null) {
-        _showSurferProUpgradePrompt(_navigatorKey.currentContext!, title: title, content: content);
       } else {
-        showSurfInsightPaywall(
+        openSurferProPaywall(
           _navigatorKey.currentContext!,
+          source: 'dashboard_explore',
           isSpanish: _isSpanish,
         );
       }
@@ -1178,18 +1177,15 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         onUpdateProfile: _updateProfile,
         onUnlockFirstInsight: _unlockFirstInsight,
         onGenerateInsight: (session) async {
-          // Trigger 3: After 5 total sessions logged
-          if (!_settings.isSurferPro && _sessionLogs.length >= 5 && _settings.surferProPopupSuppressedUntil <= _sessionLogs.length) {
-             _showSurferProUpgradePrompt(
-               context,
-               title: _isSpanish ? '¿Estás disfrutando Smart Surf?' : 'enjoying smart surf?',
-               content: _isSpanish 
-                  ? 'Lleva tu progreso al siguiente nivel con insights de IA después de cada sesión.' 
-                  : 'take your progress to the next level with ai insights after every session.',
-               isSoftUpsell: true,
-             );
-             return null;
+          final bool isPro = _settings.isSurferPro;
+          final bool hasUsedFree = _settings.hasUsedFirstFreeAIInsight;
+
+          if (!isPro && hasUsedFree) {
+            debugPrint("🤖 AI Insight: Access Denied. User is not Pro and has used free insight.");
+            openSurferProPaywall(context, source: 'generate_insight_blocked', isSpanish: _isSpanish);
+            return null;
           }
+          
           return await _generateInsight(session);
         },
         onInsightViewed: () {

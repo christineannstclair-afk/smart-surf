@@ -100,7 +100,7 @@ class _SurferProUpgradeContentState extends State<SurferProUpgradeContent> {
     if (!widget.isSurferPro) {
       if (mounted) {
         Navigator.pop(context); // Close modal
-        showSurfInsightPaywall(context, isSpanish: widget.isSpanish);
+        openSurferProPaywall(context, source: 'surfer_pro_reflection_form', isSpanish: widget.isSpanish);
       }
       return;
     }

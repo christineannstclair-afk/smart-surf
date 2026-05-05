@@ -1008,7 +1008,7 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                 onPressed: () {
                   Navigator.pop(ctx);
                   if (widget.onInsightPromptSeen != null) widget.onInsightPromptSeen!();
-                  if (widget.onOpenSurferPro != null) widget.onOpenSurferPro!();
+                  openSurferProPaywall(context, source: 'first_insight_modal', isSpanish: widget.isSpanish);
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF0F172A),
@@ -1081,7 +1081,7 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                 onPressed: () {
                   Navigator.pop(ctx);
                   if (widget.onSurferProNudgeSeen != null) widget.onSurferProNudgeSeen!(sessionCount);
-                  if (widget.onOpenSurferPro != null) widget.onOpenSurferPro!();
+                  openSurferProPaywall(context, source: 'momentum_modal', isSpanish: widget.isSpanish);
                 },
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF0F172A),
@@ -2085,11 +2085,7 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
                       // No immediate gate for the VERY first one
                       // The gating only happens if they've ALREADY used their first free one
                       if (!widget.isSurferPro && widget.hasUsedFirstFreeAIInsight) {
-                        if (widget.onOpenSurferPro != null) {
-                          widget.onOpenSurferPro!(
-                            isSoftUpsell: false,
-                          );
-                        }
+                        openSurferProPaywall(context, source: 'insight_payoff_cta', isSpanish: widget.isSpanish);
                         return;
                       }
 
@@ -2220,9 +2216,9 @@ class _SessionDetailSheetState extends State<_SessionDetailSheet> {
             height: 50,
             child: FilledButton(
               onPressed: () {
-                if (widget.onOpenSurferPro != null) {
-                  widget.onOpenSurferPro!(isSoftUpsell: false);
-                }
+                debugPrint("PAYWALL CTA tapped from insight_cta");
+                debugPrint("Opening Surfer Pro paywall from insight_cta");
+                openSurferProPaywall(context, source: 'insight_cta', isSpanish: widget.isSpanish);
               },
               style: FilledButton.styleFrom(
                 backgroundColor: AppTheme.primary,

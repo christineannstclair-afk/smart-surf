@@ -6,13 +6,22 @@ import '../../core/subscription_config.dart';
 import '../session_log/firebase_service.dart';
 import '../coach_pro/subscription_service.dart';
 
-void showSurfInsightPaywall(BuildContext context, {bool isSpanish = false}) {
+void openSurferProPaywall(BuildContext context, {required String source, bool isSpanish = false}) {
+  debugPrint('[Paywall] Opening paywall from source: $source');
+  FirebaseService().logEvent(
+    'paywall_cta_tap',
+    parameters: {'source': source},
+  );
+  
   showUpgradeBottomSheet(
     context: context,
     isSpanish: isSpanish,
     child: SurfInsightPaywall(isSpanish: isSpanish),
-  );
+  ).then((_) {
+    FirebaseService().logEvent('paywall_opened', parameters: {'success': true});
+  });
 }
+
 
 class SurfInsightPaywall extends StatefulWidget {
   final bool isSpanish;
@@ -141,6 +150,7 @@ class _SurfInsightPaywallState extends State<SurfInsightPaywall> {
               onPressed: _isLoading ? null : () async {
                 setState(() => _isLoading = true);
                 FirebaseService().logEvent('upgrade_clicked', parameters: {'package': _selectedPackageId});
+                FirebaseService().logEvent('purchase_attempt');
                 
                 try {
                   final success = await _subService.purchaseSurferPro(packageId: _selectedPackageId);

@@ -1,9 +1,18 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/subscription_config.dart';
+
+enum UserAccessState {
+  free,
+  freeWithSampleInsight,
+  pro
+}
+
 
 abstract class SubscriptionService {
   Future<void> init();
@@ -21,6 +30,7 @@ abstract class SubscriptionService {
   Future<void> openManageSubscriptions();
   Future<void> logIn(String appUserID);
   Future<void> logOut();
+  Future<UserAccessState> getUserAccessState();
 
   factory SubscriptionService() {
     if (kIsWeb) {
@@ -232,7 +242,28 @@ class RevenueCatSubscriptionService implements SubscriptionService {
       debugPrint('[PurchaseService] Error logging out user: $e');
     }
   }
+
+  @override
+  Future<UserAccessState> getUserAccessState() async {
+    final isPro = await isSurferProActive();
+    if (isPro) return UserAccessState.pro;
+
+    final prefs = await SharedPreferences.getInstance();
+    final settingsRaw = prefs.getString('swell_settings_v1');
+    if (settingsRaw != null && settingsRaw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(settingsRaw) as Map<String, dynamic>;
+        final hasUsedFirstFree = decoded['hasUsedFirstFreeAIInsight'] ?? false;
+        if (hasUsedFirstFree) return UserAccessState.freeWithSampleInsight;
+      } catch (e) {
+        debugPrint('[PurchaseService] Error parsing settings for access state: $e');
+      }
+    }
+    
+    return UserAccessState.free;
+  }
 }
+
 
 class LocalSubscriptionService implements SubscriptionService {
   static const String _coachKey = 'coach_pro_active';
@@ -297,4 +328,25 @@ class LocalSubscriptionService implements SubscriptionService {
   Future<void> logOut() async {
     debugPrint('[LocalSubscriptionService] Simulated logOut');
   }
+
+  @override
+  Future<UserAccessState> getUserAccessState() async {
+    final isPro = await isSurferProActive();
+    if (isPro) return UserAccessState.pro;
+
+    final prefs = await SharedPreferences.getInstance();
+    final settingsRaw = prefs.getString('swell_settings_v1');
+    if (settingsRaw != null && settingsRaw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(settingsRaw) as Map<String, dynamic>;
+        final hasUsedFirstFree = decoded['hasUsedFirstFreeAIInsight'] ?? false;
+        if (hasUsedFirstFree) return UserAccessState.freeWithSampleInsight;
+      } catch (e) {
+        debugPrint('[LocalPurchaseService] Error parsing settings for access state: $e');
+      }
+    }
+    
+    return UserAccessState.free;
+  }
 }
+
