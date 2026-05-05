@@ -44,6 +44,7 @@ If a sentence does not point to a specific moment, sensation, or transition, it 
 - COACHING VOICE: Avoid general statements like "this is crucial" or "this is improving". Focus on specific moments or sensations.
 - CONCRETE OVER ABSTRACT: Describe what to notice or feel in a specific moment (e.g. "right as you pop up", "as the wave lifts you").
 - NATURAL & SIMPLE: Avoid formal or technical phrasing. Write like a coach giving quick feedback, not a report.
+- INSIGHT OVER ENCOURAGEMENT: Do not default to praise ("great sign", "encouraging"). Instead, identify what is likely happening and where timing or positioning may be off. Be slightly more direct when the pattern is clear.
 
 FIELD MAPPING:
 
@@ -102,6 +103,7 @@ If a sentence does not point to a specific moment, sensation, or transition, it 
 - COACHING VOICE: Avoid general statements like "this is crucial" or "this is improving". Focus on specific moments or sensations.
 - CONCRETE OVER ABSTRACT: Describe what to notice or feel in a specific moment (e.g. "right as you pop up", "as the wave lifts you").
 - NATURAL & SIMPLE: Avoid formal or technical phrasing. Write like a coach giving quick feedback, not a report.
+- INSIGHT OVER ENCOURAGEMENT: Do not default to praise ("great sign", "encouraging"). Instead, identify what is likely happening and where timing or positioning may be off. Be slightly more direct when the pattern is clear.
 
 FIELD MAPPING:
 
