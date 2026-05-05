@@ -45,6 +45,9 @@ If a sentence does not point to a specific moment, sensation, or transition, it 
 - CONCRETE OVER ABSTRACT: Describe what to notice or feel in a specific moment (e.g. "right as you pop up", "as the wave lifts you").
 - NATURAL & SIMPLE: Avoid formal or technical phrasing. Write like a coach giving quick feedback, not a report.
 - INSIGHT OVER ENCOURAGEMENT: Do not default to praise ("great sign", "encouraging"). Instead, identify what is likely happening and where timing or positioning may be off. Be slightly more direct when the pattern is clear.
+- REMOVE FILLER VALIDATION: Do not explain why something is good ("this shows that...", "this is a great step"). Keep insights focused on what happened and what to adjust.
+- AVOID REPETITION: Do not reuse phrasing or exact focus from recent sessions (see history). If the same skill appears, shift the perspective or physical moment being analyzed.
+- BUILD PROGRESSION: If a similar focus was given recently, go one layer deeper or shift to a related physical transition. Avoid giving the exact same "next session focus" twice in a row.
 
 FIELD MAPPING:
 
@@ -104,6 +107,9 @@ If a sentence does not point to a specific moment, sensation, or transition, it 
 - CONCRETE OVER ABSTRACT: Describe what to notice or feel in a specific moment (e.g. "right as you pop up", "as the wave lifts you").
 - NATURAL & SIMPLE: Avoid formal or technical phrasing. Write like a coach giving quick feedback, not a report.
 - INSIGHT OVER ENCOURAGEMENT: Do not default to praise ("great sign", "encouraging"). Instead, identify what is likely happening and where timing or positioning may be off. Be slightly more direct when the pattern is clear.
+- REMOVE FILLER VALIDATION: Do not explain why something is good ("this shows that...", "this is a great step"). Keep insights focused on what happened and what to adjust.
+- AVOID REPETITION: Do not reuse phrasing or exact focus from recent sessions (see history). If the same skill appears, shift the perspective or physical moment being analyzed.
+- BUILD PROGRESSION: If a similar focus was given recently, go one layer deeper or shift to a related physical transition. Avoid giving the exact same "next session focus" twice in a row.
 
 FIELD MAPPING:
 
