@@ -37,6 +37,10 @@ STRICT RULES:
     * Stance & balance -> once standing on the board
     * Turning -> while riding the wave
 - FOCUS PRIORITY: If user input is vague, prioritize aligning the insight with the selected focus skill rather than general advice.
+- STRICT GROUNDING: Only reference what the user actually logged. Do not introduce new issues unless directly supported by input.
+- DATA-BASED UNCERTAINTY: If suggesting a pattern with limited data, use uncertain language ("it may be", "it seems", "there might be").
+- PHYSICAL ACTIONS ONLY: Avoid vague/fluffy language like "wave's energy". Keep it grounded in physical surfing actions (paddling, timing, stance, pop-up).
+- ALIGN NEXT FOCUS: Prioritize addressing what the user identified as "feeling off" or "hard" before introducing new concepts.
 
 FIELD MAPPING:
 
@@ -88,6 +92,10 @@ STRICT RULES:
     * Stance & balance -> once standing on the board
     * Turning -> while riding the wave
 - FOCUS PRIORITY: If user input is vague, prioritize aligning the insight with the selected focus skill rather than general advice.
+- STRICT GROUNDING: Only reference what the user actually logged. Do not introduce new issues unless directly supported by input.
+- DATA-BASED UNCERTAINTY: If suggesting a pattern with limited data, use uncertain language ("it may be", "it seems", "there might be").
+- PHYSICAL ACTIONS ONLY: Avoid vague/fluffy language like "wave's energy". Keep it grounded in physical surfing actions (paddling, timing, stance, pop-up).
+- ALIGN NEXT FOCUS: Prioritize addressing what the user identified as "feeling off" or "hard" before introducing new concepts.
 
 FIELD MAPPING:
 
