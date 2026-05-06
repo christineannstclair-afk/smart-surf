@@ -70,6 +70,7 @@ class _QuickSurferEditSheetState extends State<QuickSurferEditSheet> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 100);
     if (picked != null) {
+      debugPrint("DEBUG: Crop screen opened for path: ${picked.path}");
       final croppedFile = await ImageCropper().cropImage(
         sourcePath: picked.path,
         aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
@@ -87,11 +88,16 @@ class _QuickSurferEditSheetState extends State<QuickSurferEditSheet> {
             resetAspectRatioEnabled: false,
             doneButtonTitle: widget.isSpanish ? 'Hecho' : 'Done',
             cancelButtonTitle: widget.isSpanish ? 'Cancelar' : 'Cancel',
+            rotateButtonsHidden: true,
+            rotateClockwiseButtonHidden: true,
+            aspectRatioPickerButtonHidden: true,
+            resetButtonHidden: true,
           ),
         ],
       );
 
       if (croppedFile != null) {
+        debugPrint("DEBUG: Crop done tapped. Cropped path: ${croppedFile.path}");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Uploading photo..."), duration: Duration(seconds: 1)),
@@ -105,14 +111,19 @@ class _QuickSurferEditSheetState extends State<QuickSurferEditSheet> {
         );
 
         if (fbResult != null && fbResult.success) {
+          debugPrint("DEBUG: Cropped image saved and uploaded. URL: ${fbResult.url}");
           setState(() => currentPhotoPath = fbResult.url);
+          debugPrint("DEBUG: Crop screen dismissed (via image_cropper internal flow)");
         } else {
+          debugPrint("DEBUG: Upload failed after crop: ${fbResult?.errorCode}");
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text("Upload failed: ${fbResult?.errorCode ?? 'unknown'}")),
             );
           }
         }
+      } else {
+        debugPrint("DEBUG: Crop cancel tapped");
       }
     }
   }

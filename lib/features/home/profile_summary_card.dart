@@ -205,75 +205,81 @@ class ProfileSummaryCardState extends State<ProfileSummaryCard> {
         imageQuality: 80,
       );
 
-      if (picked == null) return;
-
-      // Add cropping step
-      final croppedFile = await ImageCropper().cropImage(
-        sourcePath: picked.path,
-        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: _t("Crop Photo", "Recortar Foto"),
-            toolbarColor: const Color(0xFF0F172A),
-            toolbarWidgetColor: Colors.white,
-            initAspectRatio: CropAspectRatioPreset.square,
-            lockAspectRatio: true,
-          ),
-          IOSUiSettings(
-            title: _t("Crop Photo", "Recortar Foto"),
-            aspectRatioLockEnabled: true,
-            resetAspectRatioEnabled: false,
-            doneButtonTitle: _t("Done", "Hecho"),
-            cancelButtonTitle: _t("Cancel", "Cancelar"),
-          ),
-        ],
-      );
-
-      if (croppedFile != null) {
-        setState(() => _debugStatus = "Picker: Image selected (${croppedFile.path}).");
-        final bytesCount = kIsWeb ? (await croppedFile.readAsBytes()).length : -1;
-        debugPrint("Profile: Image picked. Path: ${croppedFile.path}, Size: $bytesCount bytes (web)");
-        setState(() => _debugStatus = "Uploading ${bytesCount > 0 ? bytesCount : ''} bytes...");
-        
-        String? pathToSave;
-        Uint8List? bytes;
-        if (kIsWeb) {
-          setState(() => _debugStatus = "Web: Reading file bytes...");
-          bytes = await croppedFile.readAsBytes();
-          setState(() => _debugStatus = "Web: Bytes read (${bytes?.length}). Initializing Firebase Upload...");
-        }
-
-        debugPrint("Profile: Calling FirebaseService().uploadMedia... UID: ${FirebaseService().currentUid}");
-        final fbResult = await FirebaseService().uploadMedia(
-            localPath: croppedFile.path,
-            isProfile: true,
-            isVideo: false,
-            webBytes: bytes,
+      if (picked != null) {
+        debugPrint("DEBUG: Crop screen opened for path: ${picked.path}");
+        // Add cropping step
+        final croppedFile = await ImageCropper().cropImage(
+          sourcePath: picked.path,
+          aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: _t("Crop Photo", "Recortar Foto"),
+              toolbarColor: const Color(0xFF0F172A),
+              toolbarWidgetColor: Colors.white,
+              initAspectRatio: CropAspectRatioPreset.square,
+              lockAspectRatio: true,
+            ),
+            IOSUiSettings(
+              title: _t("Crop Photo", "Recortar Foto"),
+              aspectRatioLockEnabled: true,
+              resetAspectRatioEnabled: false,
+              doneButtonTitle: _t("Done", "Hecho"),
+              cancelButtonTitle: _t("Cancel", "Cancelar"),
+              rotateButtonsHidden: true,
+              rotateClockwiseButtonHidden: true,
+              aspectRatioPickerButtonHidden: true,
+              resetButtonHidden: true,
+            ),
+          ],
         );
-        
-        if (fbResult != null && fbResult.success) {
-            debugPrint("Profile: Firebase upload SUCCESS. URL: ${fbResult.url}, StoragePath: ${fbResult.path}");
+
+        if (croppedFile != null) {
+          debugPrint("DEBUG: Crop done tapped. Cropped path: ${croppedFile.path}");
+          setState(() => _debugStatus = "Picker: Image selected (${croppedFile.path}).");
+          final bytesCount = kIsWeb ? (await croppedFile.readAsBytes()).length : -1;
+          debugPrint("Profile: Image picked. Path: ${croppedFile.path}, Size: $bytesCount bytes (web)");
+          setState(() => _debugStatus = "Uploading ${bytesCount > 0 ? bytesCount : ''} bytes...");
+          
+          String? pathToSave;
+          Uint8List? bytes;
+          if (kIsWeb) {
+            setState(() => _debugStatus = "Web: Reading file bytes...");
+            bytes = await croppedFile.readAsBytes();
+            setState(() => _debugStatus = "Web: Bytes read (${bytes?.length}). Initializing Firebase Upload...");
+          }
+
+          debugPrint("Profile: Calling FirebaseService().uploadMedia... UID: ${FirebaseService().currentUid}");
+          final fbResult = await FirebaseService().uploadMedia(
+              localPath: croppedFile.path,
+              isProfile: true,
+              isVideo: false,
+              webBytes: bytes,
+          );
+
+          if (fbResult != null && fbResult.success) {
+            debugPrint("DEBUG: Cropped image saved and uploaded. URL: ${fbResult.url}");
             setState(() => _debugStatus = "Syncing Firestore Profile...");
             
-            debugPrint("Profile: Calling syncProfileToFirestore...");
             await FirebaseService().syncProfileToFirestore(
                 photoUrl: fbResult.url!,
                 storagePath: fbResult.path!,
             );
             
-            debugPrint("Profile: syncProfileToFirestore returned. Calling _callUpdate with stable URL.");
             setState(() => _debugStatus = "Profile Photo Saved!");
-            pathToSave = fbResult.url;
-            _callUpdate(profilePhotoPath: pathToSave);
-        } else {
+            _callUpdate(profilePhotoPath: fbResult.url);
+            debugPrint("DEBUG: Crop screen dismissed (via image_cropper internal flow)");
+          } else {
             final errorMsg = fbResult?.errorCode ?? "unknown";
-            debugPrint("Profile ERROR: Firebase upload failed. Code: $errorMsg");
-            setState(() => _debugStatus = "Error: $errorMsg (Path: ${fbResult?.path ?? 'evaluating...'})");
+            debugPrint("DEBUG: Upload failed after crop: $errorMsg");
+            setState(() => _debugStatus = "Upload failed: $errorMsg");
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text(_t("Upload failed:", "Error al subir:") + " $errorMsg")),
               );
             }
+          }
+        } else {
+          debugPrint("DEBUG: Crop cancel tapped");
         }
       } else {
         debugPrint("Profile: Picker dismissed or failed.");
