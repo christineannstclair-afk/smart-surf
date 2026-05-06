@@ -86,33 +86,59 @@ def get_existing_insight(uid: str, session_id: str):
         print(f"Error checking existing insight: {e}")
     return None
 
-def atomic_check_and_increment_limit(uid: str):
+def check_daily_limit(uid: str):
     """
-    Enforces the 3-per-day AI insight limit and increments it atomically 
-    BEFORE the expensive AI call. Returns the current usage count.
+    Checks if the user has reached their daily limit of 3 AI insights.
+    Returns the current count. Blocks with 429 if limit reached.
     """
-    if not db: return
-    
+    if not db: return 0
     from datetime import datetime, timezone
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    print(f"DEBUG: [LimitCheck] uid={uid}, date={today_str}")
+    
     user_ref = db.collection('users').document(uid)
+    doc = user_ref.get()
+    
+    if doc.exists:
+        data = doc.to_dict()
+        last_date = data.get('lastAiInsightDate')
+        if last_date == today_str:
+            count = data.get('aiInsightsTodayCount', 0)
+            print(f"DEBUG: [LimitCheck] Current count: {count}/3")
+            if count >= 3:
+                print(f"DEBUG: [LimitCheck] BLOCKED: Limit reached for {uid}")
+                raise HTTPException(
+                    status_code=429, 
+                    detail={
+                        "error": "daily_limit_reached",
+                        "message": "Daily insight limit reached. You can generate up to 3 insights per day."
+                    }
+                )
+            return count
+    print(f"DEBUG: [LimitCheck] Allowed: Count is 0 or date changed.")
+    return 0
 
-    def update_in_transaction(transaction):
+def increment_daily_limit(uid: str):
+    """
+    Increments the AI insight count for today. 
+    Called ONLY after a successful generation and save.
+    """
+    if not db: return
+    from datetime import datetime, timezone
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    user_ref = db.collection('users').document(uid)
+    
+    def do_increment(transaction):
         snapshot = user_ref.get(transaction=transaction)
-        
-        current_count = 0
+        count = 0
         if snapshot.exists:
             data = snapshot.to_dict()
-            last_date = data.get('lastAiInsightDate')
-            
-            if last_date == today_str:
-                current_count = data.get('aiInsightsTodayCount', 0)
-                if current_count >= 3:
-                    # Raise a standard exception that we catch outside
-                    raise ValueError("LIMIT_REACHED")
+            if data.get('lastAiInsightDate') == today_str:
+                count = data.get('aiInsightsTodayCount', 0)
         
-        # Atomically increment
-        new_count = current_count + 1
+        new_count = count + 1
         transaction.set(user_ref, {
             'aiInsightsTodayCount': new_count,
             'lastAiInsightDate': today_str,
@@ -121,16 +147,10 @@ def atomic_check_and_increment_limit(uid: str):
         return new_count
 
     try:
-        new_count = db.run_transaction(update_in_transaction)
-        print(f"DEBUG: Usage for {uid} incremented to {new_count}/3 for {today_str} (UTC)")
-    except ValueError as ve:
-        if str(ve) == "LIMIT_REACHED":
-            print(f"DEBUG: Limit reached for {uid}")
-            raise HTTPException(status_code=403, detail="Daily AI insight limit reached (3/3)")
-        raise
+        new_val = db.run_transaction(do_increment)
+        print(f"DEBUG: [LimitIncrement] Success. New count: {new_val}/3 for {uid}")
     except Exception as e:
-        print(f"DEBUG: Transaction failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to enforce usage limits")
+        print(f"DEBUG: [LimitIncrement] ERROR: {e}")
 
 def record_insight_in_session(uid: str, session_id: str, insight_data: dict):
     """Records the generated insight in the session document."""
@@ -224,27 +244,15 @@ class ReflectionRequest(BaseModel):
 async def analyze_reflection(
     request: ReflectionRequest,
     force_refresh: bool = False,
+    current_user: dict = Depends(get_current_user)
 ):
-    # ── AUTH DISABLED FOR DEVELOPMENT ─────────────────────────────────────────
-    # TODO: Re-enable auth before production release
-    # Use session_id as uid so Firestore writes have a stable key
-    uid = request.session_id or "dev_user"
-    print(f"[Dev] Auth disabled. uid={uid}")
-    # ─────────────────────────────────────────────────────────────────────────
+    uid = current_user['uid']
+    print(f"[Auth] analyze_reflection for uid={uid}")
 
     try:
-        # 1. Per-session cache check
-        if request.session_id and not force_refresh:
-            existing = get_existing_insight(uid, request.session_id)
-            if existing:
-                print(f"\n[DataAudit] CACHE HIT for session {request.session_id}")
-                print(f"[DataAudit] FINAL_OUTPUT_SENT_TO_UI (CACHED): {json.dumps(existing, indent=2)}")
-                return existing
-        elif request.session_id and force_refresh:
-            print(f"[DataAudit] force_refresh=true — bypassing cache for session {request.session_id}")
-
-        # 2. Skip daily limit enforcement (requires verified uid — re-enable with auth)
-        print("[Dev] Daily limit check skipped (auth disabled)")
+        # 2. Daily limit check: block if 3/3
+        # We do NOT increment here. We only check.
+        check_daily_limit(uid)
 
         # 3. Fetch recent session history
         history = []
@@ -278,8 +286,11 @@ async def analyze_reflection(
 
         # 5. Record in Firestore session document
         record_insight_in_session(uid, request.session_id, result)
-        print("[LLM] Insight recorded in Firestore. Returning result.")
+        print("[LLM] Insight recorded in Firestore.")
 
+        # 6. Increment limit count ONLY after successful save
+        increment_daily_limit(uid)
+        
         return result
     except HTTPException:
         raise
@@ -312,8 +323,8 @@ async def analyze_popup(
                     "note": "Returned existing insight"
                 }
         
-        # 2. Daily limit check & Atomic Increment: block if 3/3
-        atomic_check_and_increment_limit(uid)
+        # 2. Daily limit check: block if 3/3
+        check_daily_limit(uid)
     except HTTPException:
         raise
 
@@ -369,7 +380,10 @@ async def analyze_popup(
         }
         record_insight_in_session(uid, session_id, insight_data)
         
-        # 6. Return results
+        # 6. Increment limit count ONLY after successful save
+        increment_daily_limit(uid)
+
+        # 7. Return results
         return result
         
     except HTTPException:

@@ -733,6 +733,10 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                                     rating: rating,
                                     notes: focusCtrl.text.trim(),
                                     isCompleted: true,
+                                    mediaPath: mediaPath,
+                                    mediaType: mediaType,
+                                    waveCount: int.tryParse(waveCountCtrl.text),
+                                    reflectionConditions: selectedConditions,
                                   );
                                   widget.onAdd(entry);
                                   Navigator.pop(ctx, entry);

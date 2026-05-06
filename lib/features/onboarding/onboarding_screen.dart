@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:image_cropper/image_cropper.dart';
+import '../../widgets/smart_surf_crop_screen.dart';
 
 import '../../core/permission_service.dart';
 import '../../core/translation_service.dart';
@@ -141,26 +142,19 @@ Future<void> _pickImage() async {
 
   if (picked == null) return;
 
+  debugPrint("DEBUG: Image picked. Waiting for UI to settle...");
+  await Future.delayed(const Duration(milliseconds: 1000));
+
+  debugPrint("DEBUG: Crop screen opening...");
   // Add cropping step
-  final croppedFile = await ImageCropper().cropImage(
-    sourcePath: picked.path,
-    aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-    uiSettings: [
-      AndroidUiSettings(
-        toolbarTitle: t("onboarding_crop_photo", "Crop Photo"),
-        toolbarColor: const Color(0xFF0F172A),
-        toolbarWidgetColor: Colors.white,
-        initAspectRatio: CropAspectRatioPreset.square,
-        lockAspectRatio: true,
+  final File? croppedFile = await Navigator.push<File>(
+    context,
+    MaterialPageRoute(
+      builder: (context) => SmartSurfCropScreen(
+        image: File(picked.path),
+        isSpanish: widget.isSpanish,
       ),
-      IOSUiSettings(
-        title: t("onboarding_crop_photo", "Crop Photo"),
-        aspectRatioLockEnabled: true,
-        resetAspectRatioEnabled: false,
-        doneButtonTitle: t("Done", "Hecho"),
-        cancelButtonTitle: t("Cancel", "Cancelar"),
-      ),
-    ],
+    ),
   );
 
   if (croppedFile == null) return;

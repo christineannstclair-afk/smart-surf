@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:image_cropper/image_cropper.dart';
+import '../../widgets/smart_surf_crop_screen.dart';
 import '../session_log/firebase_service.dart';
 import '../../ui_system/app_theme.dart';
 
@@ -210,30 +210,19 @@ class _ProfileInfoEditSheetState extends State<ProfileInfoEditSheet> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 100);
     if (picked != null) {
-      debugPrint("DEBUG: Crop screen opened for path: ${picked.path}");
-      final croppedFile = await ImageCropper().cropImage(
-        sourcePath: picked.path,
-        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: widget.isSpanish ? 'Recortar Foto' : 'Crop Photo',
-            toolbarColor: const Color(0xFF0F172A),
-            toolbarWidgetColor: Colors.white,
-            initAspectRatio: CropAspectRatioPreset.square,
-            lockAspectRatio: true,
+      debugPrint("DEBUG: Image picked. Waiting for UI to settle...");
+      await Future.delayed(const Duration(milliseconds: 1000)); // Longer delay for stability
+      
+      debugPrint("DEBUG: Crop screen opening...");
+      debugPrint("DEBUG: Opening custom Flutter crop screen...");
+      final File? croppedFile = await Navigator.push<File>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SmartSurfCropScreen(
+            image: File(picked.path),
+            isSpanish: widget.isSpanish,
           ),
-          IOSUiSettings(
-            title: widget.isSpanish ? 'Recortar Foto' : 'Crop Photo',
-            aspectRatioLockEnabled: true,
-            resetAspectRatioEnabled: false,
-            doneButtonTitle: widget.isSpanish ? 'Hecho' : 'Done',
-            cancelButtonTitle: widget.isSpanish ? 'Cancelar' : 'Cancel',
-            rotateButtonsHidden: true,
-            rotateClockwiseButtonHidden: true,
-            aspectRatioPickerButtonHidden: true,
-            resetButtonHidden: true,
-          ),
-        ],
+        ),
       );
 
       if (croppedFile != null) {

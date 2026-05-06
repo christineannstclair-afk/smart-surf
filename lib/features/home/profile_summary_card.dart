@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
-import 'package:image_cropper/image_cropper.dart';
+import '../../widgets/smart_surf_crop_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/permission_service.dart';
 import '../../ui_system/app_card.dart';
@@ -206,31 +206,19 @@ class ProfileSummaryCardState extends State<ProfileSummaryCard> {
       );
 
       if (picked != null) {
+        debugPrint("DEBUG: Image picked. Waiting for picker to dismiss...");
+        await Future.delayed(const Duration(milliseconds: 1000));
+
         debugPrint("DEBUG: Crop screen opened for path: ${picked.path}");
         // Add cropping step
-        final croppedFile = await ImageCropper().cropImage(
-          sourcePath: picked.path,
-          aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-          uiSettings: [
-            AndroidUiSettings(
-              toolbarTitle: _t("Crop Photo", "Recortar Foto"),
-              toolbarColor: const Color(0xFF0F172A),
-              toolbarWidgetColor: Colors.white,
-              initAspectRatio: CropAspectRatioPreset.square,
-              lockAspectRatio: true,
+        final File? croppedFile = await Navigator.push<File>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SmartSurfCropScreen(
+              image: File(picked.path),
+              isSpanish: widget.isSpanish,
             ),
-            IOSUiSettings(
-              title: _t("Crop Photo", "Recortar Foto"),
-              aspectRatioLockEnabled: true,
-              resetAspectRatioEnabled: false,
-              doneButtonTitle: _t("Done", "Hecho"),
-              cancelButtonTitle: _t("Cancel", "Cancelar"),
-              rotateButtonsHidden: true,
-              rotateClockwiseButtonHidden: true,
-              aspectRatioPickerButtonHidden: true,
-              resetButtonHidden: true,
-            ),
-          ],
+          ),
         );
 
         if (croppedFile != null) {

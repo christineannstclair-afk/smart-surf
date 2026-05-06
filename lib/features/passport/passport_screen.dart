@@ -251,8 +251,7 @@ class SurfPassportScreenState extends State<SurfPassportScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Latest Session Media (Dynamic fetch: most recent with media)
-                            _buildLastSessionMediaHeader(),
+
                             
                             // Identity Block
                             _buildIdentityRow(),
@@ -318,6 +317,9 @@ class SurfPassportScreenState extends State<SurfPassportScreen> {
                             ),
                             const SizedBox(height: 12),
                             _buildFocusSkillsSection(focus),
+                            const SizedBox(height: 12),
+                            // Latest Session Media (Moved lower)
+                            _buildLastSessionMediaHeader(),
 
                           ],
                         ),

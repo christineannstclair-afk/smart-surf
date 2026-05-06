@@ -190,8 +190,10 @@ setState(() => _currentStep = 3);
         if (mounted) {
            ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(t("Daily AI limit reached (3/3). Try again tomorrow!", "Límite diario de IA alcanzado (3/3). ¡Intenta mañana!")),
-              backgroundColor: Colors.orange.shade800,
+              content: Text(t(
+                "Daily insight limit reached. You can generate up to 3 insights per day.", 
+                "Daily insight limit reached. You can generate up to 3 insights per day."
+              )),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -251,14 +253,18 @@ setState(() => _currentStep = 3);
           _uploadError = e.toString();
         });
         
-        if (e.toString().contains("403")) {
+        if (e.toString().contains("DAILY_LIMIT_REACHED")) {
            ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(t("Daily AI limit reached (3/3). Try again tomorrow!", "Límite diario de IA alcanzado (3/3). ¡Intenta mañana!")),
-              backgroundColor: Colors.orange.shade800,
+              content: Text(t(
+                "Daily insight limit reached. You can generate up to 3 insights per day.", 
+                "Daily insight limit reached. You can generate up to 3 insights per day."
+              )),
               behavior: SnackBarBehavior.floating,
             ),
           );
+          // Stop loading state
+          setState(() => _currentStep = 3);
         }
       }
     }

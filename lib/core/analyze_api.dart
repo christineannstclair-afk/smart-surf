@@ -69,10 +69,17 @@ class AnalyzeApi {
         return jsonDecode(response.body);
       } else if (response.statusCode == 413) {
         throw Exception('File exceeds maximum size of 50MB');
+      } else if (response.statusCode == 429) {
+        debugPrint("AnalyzeApi: DAILY LIMIT REACHED ✖ (HTTP 429)");
+        throw Exception('DAILY_LIMIT_REACHED');
       } else {
         throw Exception('Failed to analyze video: ${response.statusCode}');
       }
     } catch (e) {
+      debugPrint("AnalyzeApi: REQUEST FAILED: $e");
+      if (e.toString().contains('DAILY_LIMIT_REACHED')) {
+        throw Exception('DAILY_LIMIT_REACHED');
+      }
       throw Exception('Analysis failed: $e');
     }
   }
@@ -129,15 +136,27 @@ class AnalyzeApi {
         }),
       ).timeout(const Duration(seconds: 30)); 
 
+      debugPrint("AnalyzeApi: Response status: ${response.statusCode}");
+      
       if (response.statusCode == 200) {
         debugPrint("AnalyzeApi: REAL BACKEND SUCCESS ✔");
         return jsonDecode(response.body);
+      } else if (response.statusCode == 429) {
+        debugPrint("AnalyzeApi: DAILY LIMIT REACHED ✖ (HTTP 429)");
+        final body = jsonDecode(response.body);
+        if (body['detail'] != null && body['detail']['error'] == 'daily_limit_reached') {
+          throw Exception('DAILY_LIMIT_REACHED');
+        }
+        throw Exception('DAILY_LIMIT_REACHED');
       } else {
         debugPrint("AnalyzeApi: BACKEND ERROR ${response.statusCode} ✖");
         throw Exception('Failed with status: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint("AnalyzeApi: REQUEST FAILED: $e");
+      if (e.toString().contains('DAILY_LIMIT_REACHED')) {
+        throw Exception('DAILY_LIMIT_REACHED');
+      }
       throw Exception('Reflection request failed: $e');
     }
   }

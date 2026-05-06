@@ -522,8 +522,14 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
     } catch (e) {
       debugPrint("Error unlocking first insight: $e");
       if (mounted) {
+        String message = _isSpanish ? "Error al desbloquear insight" : "Error unlocking insight";
+        if (e.toString().contains('DAILY_LIMIT_REACHED')) {
+          message = _isSpanish 
+            ? "Daily insight limit reached. You can generate up to 3 insights per day."
+            : "Daily insight limit reached. You can generate up to 3 insights per day.";
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_isSpanish ? "Error al desbloquear insight" : "Error unlocking insight")),
+          SnackBar(content: Text(message)),
         );
       }
       return null;
@@ -584,6 +590,18 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
 
     } catch (e) {
       debugPrint("🤖 AI Insight: Error caught in _generateInsight: $e");
+      if (mounted) {
+        if (e.toString().contains('DAILY_LIMIT_REACHED')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_isSpanish 
+                ? "Daily insight limit reached. You can generate up to 3 insights per day."
+                : "Daily insight limit reached. You can generate up to 3 insights per day."),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
       return null;
     }
   }
