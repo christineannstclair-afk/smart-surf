@@ -243,6 +243,7 @@ class HomeScreenState extends State<HomeScreen> {
         required bool locationVisibleOnDashboard,
         required bool ageVisibleToCoach,
         required bool ageVisibleOnDashboard,
+        required String? profilePhotoPath,
       }) {
         widget.onUpdate(
           levelEnTitle: widget.levelEnTitle,
@@ -255,7 +256,7 @@ class HomeScreenState extends State<HomeScreen> {
           weight: weight,
           location: location,
           displayName: displayName,
-          profilePhotoPath: widget.profilePhotoPath,
+          profilePhotoPath: profilePhotoPath,
           stanceVisibleToCoach: stanceVisibleToCoach,
           stanceVisibleOnDashboard: stanceVisibleOnDashboard,
           heightVisibleToCoach: heightVisibleToCoach,
@@ -284,7 +285,7 @@ class HomeScreenState extends State<HomeScreen> {
           focusSkills: widget.focusEn,
           age: age,
           displayName: displayName,
-          profilePhotoPath: widget.profilePhotoPath,
+          profilePhotoPath: profilePhotoPath,
           surferSummary: surferSummary,
           stance: stance,
           height: height,

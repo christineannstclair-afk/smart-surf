@@ -317,8 +317,9 @@ class FirebaseService {
       final docId = sessionId;
       final writeData = {
         'mediaUrl': photoUrl,
+        'mediaPath': photoUrl,
         'mediaStoragePath': storagePath,
-        'mediaType': isVideo ? 'video' : 'photo',
+        'mediaType': isVideo ? 'video' : 'image',
         'mediaContentType': isVideo ? 'video/mp4' : 'image/jpeg',
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -404,25 +405,41 @@ class FirebaseService {
         final mediaUrl = data['mediaUrl'] as String?;
         final mediaType = data['mediaType'] as String?;
         
-        if (FirebaseService.isStableUrl(mediaUrl)) {
-           final cacheIndex = hydratedSessions.indexWhere((s) => s.id == docId);
-           if (cacheIndex != -1) {
-              final cached = hydratedSessions[cacheIndex];
-              hydratedSessions[cacheIndex] = cached.copyWith(
-                  mediaPath: mediaUrl,
-                  mediaType: mediaType ?? cached.mediaType,
-              );
-              
-              if (hydratedProgress.latestMediaPath != null && 
-                  (hydratedProgress.latestMediaPath == cached.mediaPath || 
-                   !FirebaseService.isStableUrl(hydratedProgress.latestMediaPath))) {
-                   hydratedProgress = hydratedProgress.copyWith(
-                        latestMediaPath: mediaUrl,
-                        latestMediaType: mediaType ?? hydratedProgress.latestMediaType,
-                   );
-              }
+        final cacheIndex = hydratedSessions.indexWhere((s) => s.id == docId);
+        if (cacheIndex != -1) {
+           // Update existing
+           final cached = hydratedSessions[cacheIndex];
+           hydratedSessions[cacheIndex] = cached.copyWith(
+               mediaPath: mediaUrl ?? cached.mediaPath,
+               mediaType: mediaType ?? cached.mediaType,
+           );
+        } else {
+           // Add missing session from Firestore
+           try {
+             final newEntry = SessionLogEntry.fromJson(data);
+             hydratedSessions.add(newEntry);
+           } catch (e) {
+             debugPrint("Firebase: Error parsing missing session $docId: $e");
            }
         }
+
+      }
+      
+      // Update latest media based on the most recent session that has it
+      if (hydratedSessions.isNotEmpty) {
+          // Sort by date descending
+          hydratedSessions.sort((a, b) => b.date.compareTo(a.date));
+          final latestWithMedia = hydratedSessions.firstWhere(
+            (s) => s.mediaPath != null && FirebaseService.isStableUrl(s.mediaPath),
+            orElse: () => hydratedSessions.first, // fallback to avoid error, but we check mediaPath below
+          );
+          
+          if (latestWithMedia.mediaPath != null && FirebaseService.isStableUrl(latestWithMedia.mediaPath)) {
+            hydratedProgress = hydratedProgress.copyWith(
+              latestMediaPath: latestWithMedia.mediaPath,
+              latestMediaType: latestWithMedia.mediaType,
+            );
+          }
       }
     } catch (e) {
       debugPrint("Failed querying Firestore for full hydration: $e");

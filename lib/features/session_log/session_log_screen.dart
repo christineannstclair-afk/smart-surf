@@ -404,6 +404,31 @@ class SessionLogScreenState extends State<SessionLogScreen> {
 
       if (picked == null) return null;
 
+      // Size check (max 50 MB)
+      final sizeInBytes = await picked.length();
+      const maxSizeInBytes = 50 * 1024 * 1024;
+      if (sizeInBytes > maxSizeInBytes) {
+          if (mounted) {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text(t("File Too Large", "Archivo demasiado grande")),
+                  content: Text(t(
+                    "Media files must be 50MB or less.",
+                    "Los archivos de media deben ser de 50MB o menos."
+                  )),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text("OK"),
+                    ),
+                  ],
+                ),
+              );
+          }
+          continue;
+      }
+
       int durationSecs = 0;
       if (isVideo) {
         final controller = kIsWeb 
@@ -1293,6 +1318,7 @@ class SessionLogScreenState extends State<SessionLogScreen> {
         required bool locationVisibleOnDashboard,
         required bool ageVisibleToCoach,
         required bool ageVisibleOnDashboard,
+        required String? profilePhotoPath,
       }) {
         widget.onUpdateProfile(
           stance: stance,
@@ -1307,7 +1333,7 @@ class SessionLogScreenState extends State<SessionLogScreen> {
           boardEn: widget.boardEn,
           focusEn: widget.focusEn,
           displayName: displayName,
-          profilePhotoPath: widget.profilePhotoPath,
+          profilePhotoPath: profilePhotoPath,
           stanceVisibleToCoach: stanceVisibleToCoach,
           stanceVisibleOnDashboard: stanceVisibleOnDashboard,
           heightVisibleToCoach: heightVisibleToCoach,
@@ -1366,7 +1392,7 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                   padding: EdgeInsets.zero,
                   children: [
                     _buildHeroHeader(),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 60),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 18),
                       child: Column(
@@ -1435,6 +1461,7 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 120), // Padding for FloatingActionButton
                   ],
                 ),
               ),
@@ -1477,64 +1504,115 @@ class SessionLogScreenState extends State<SessionLogScreen> {
     ).length;
     final currentStreak = _calculateStreak(completedLogs);
 
-    return Column(
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
+        // 1. Teal Header Block
         Container(
           width: double.infinity,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary,
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(32),
-              bottomRight: Radius.circular(32),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                AppTheme.primary, // Deep Sea Teal
+                Color(0xFF0F172A), // Deep Navy
+              ],
+            ),
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(40),
+              bottomRight: Radius.circular(40),
             ),
           ),
           child: SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 220), // Pushed image down further to clear text
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        SmartSurfWordmark(
-                          isInverse: true,
-                          onTap: widget.onReturnToDashboard,
-                        ),
-                        LanguageMenu(
-                          isSpanish: widget.isSpanish,
-                          onSetLanguage: widget.onSetLanguage,
-                        ),
-                      ],
-                    ),
+                  // Logo and Language Menu
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      SmartSurfWordmark(
+                        isInverse: true,
+                        onTap: widget.onReturnToDashboard,
+                      ),
+                      LanguageMenu(
+                        isSpanish: widget.isSpanish,
+                        onSetLanguage: widget.onSetLanguage,
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 24),
+                  // Dynamic Greeting
                   Text(
                     _getDynamicGreeting(widget.displayName),
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Main Heading
+                  Text(
+                    t("Ready to log your surf?", "¿Listo para registrar tu surf?"),
+                    style: const TextStyle(
                       color: Colors.white,
+                      fontSize: 28,
                       fontWeight: FontWeight.w900,
+                      height: 1.1,
+                      letterSpacing: -0.5,
                     ),
                   ),
                   if (completedLogs.isNotEmpty) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
                     Row(
                       children: [
                         _HeaderStat(
                           label: t("This month", "Este mes"),
                           value: "$sessionsThisMonth",
+                          isDark: false,
                         ),
-                        const SizedBox(width: 24),
+                        const SizedBox(width: 32),
                         _HeaderStat(
                           label: t("Current streak", "Racha actual"),
                           value: "$currentStreak",
+                          isDark: false,
                         ),
                       ],
                     ),
                   ],
                 ],
+              ),
+            ),
+          ),
+        ),
+        // 2. Overlapping 'Poke Out' Image
+        Positioned(
+          bottom: -50, // Pokes out over the edge
+          left: 20,
+          right: 20,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.25),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: Image.asset(
+                'assets/abstract_surf_journey_calm_1778022747498.png',
+                width: double.infinity,
+                height: 220,
+                fit: BoxFit.cover,
               ),
             ),
           ),
@@ -1784,15 +1862,19 @@ class _SelectorLabel extends StatelessWidget {
 class _HeaderStat extends StatelessWidget {
   final String label;
   final String value;
-  const _HeaderStat({required this.label, required this.value});
+  final bool isDark;
+  const _HeaderStat({required this.label, required this.value, this.isDark = false});
 
   @override
   Widget build(BuildContext context) {
+    final textColor = isDark ? AppTheme.textPrimary : Colors.white;
+    final labelColor = isDark ? AppTheme.textMuted : Colors.white70;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w600)),
+        Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textColor)),
+        Text(label, style: TextStyle(fontSize: 12, color: labelColor, fontWeight: FontWeight.w600)),
       ],
     );
   }
@@ -1836,64 +1918,89 @@ class _SessionCard extends StatelessWidget {
       child: AppCard(
         onTap: onTap,
         padding: const EdgeInsets.all(20),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    spotName,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          spotName,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatDate(session.date),
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "${SurfConstants.getWaveHeightTranslation(session.waveSize, isSpanish, units: units)} · ${SurfConstants.getBoardTranslation(session.board, isSpanish).split(" · ").first}",
+                    style: const TextStyle(fontSize: 13, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 16),
+                  if (session.sessionFocus.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        "🎯 ${SurfConstants.getFocusSkillTranslation(session.sessionFocus, isSpanish)}",
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (session.notes.isNotEmpty)
+                    Text(
+                      session.notes,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (session.mediaPath != null) ...[
+              const SizedBox(width: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: MediaCard(
+                    isSpanish: isSpanish,
+                    state: session.mediaType == 'video' ? MediaCardState.video : MediaCardState.image,
+                    mediaPath: session.mediaPath,
+                    mediaType: session.mediaType,
+                    isEditable: false,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  _formatDate(session.date),
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              "${SurfConstants.getWaveHeightTranslation(session.waveSize, isSpanish, units: units)} · ${SurfConstants.getBoardTranslation(session.board, isSpanish).split(" · ").first}",
-              style: const TextStyle(fontSize: 13, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 16),
-            if (session.sessionFocus.isNotEmpty) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  "🎯 ${SurfConstants.getFocusSkillTranslation(session.sessionFocus, isSpanish)}",
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                ),
               ),
-              const SizedBox(height: 12),
             ],
-            if (session.notes.isNotEmpty)
-              Text(
-                session.notes,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
           ],
         ),
       ),
     );
   }
 }
+
 
 class _SessionDetailSheet extends StatefulWidget {
   final SessionLogEntry session;

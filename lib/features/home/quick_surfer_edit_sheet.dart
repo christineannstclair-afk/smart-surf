@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import '../../ui_system/app_theme.dart';
+import '../session_log/firebase_service.dart';
+
 
 class QuickSurferEditSheet extends StatefulWidget {
   final bool isSpanish;
@@ -65,9 +68,52 @@ class _QuickSurferEditSheetState extends State<QuickSurferEditSheet> {
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 512, maxHeight: 512, imageQuality: 75);
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 100);
     if (picked != null) {
-      setState(() => currentPhotoPath = picked.path);
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: widget.isSpanish ? 'Recortar Foto' : 'Crop Photo',
+            toolbarColor: const Color(0xFF0F172A),
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(
+            title: widget.isSpanish ? 'Recortar Foto' : 'Crop Photo',
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+            doneButtonTitle: widget.isSpanish ? 'Hecho' : 'Done',
+            cancelButtonTitle: widget.isSpanish ? 'Cancelar' : 'Cancel',
+          ),
+        ],
+      );
+
+      if (croppedFile != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Uploading photo..."), duration: Duration(seconds: 1)),
+          );
+        }
+
+        final fbResult = await FirebaseService().uploadMedia(
+          localPath: croppedFile.path,
+          isProfile: true,
+          isVideo: false,
+        );
+
+        if (fbResult != null && fbResult.success) {
+          setState(() => currentPhotoPath = fbResult.url);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("Upload failed: ${fbResult?.errorCode ?? 'unknown'}")),
+            );
+          }
+        }
+      }
     }
   }
 
@@ -88,12 +134,21 @@ class _QuickSurferEditSheetState extends State<QuickSurferEditSheet> {
             onTap: _pickImage,
             child: Stack(
               children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: const Color(0xFFF1F5F9),
-                  backgroundImage: currentPhotoPath != null 
-                    ? (currentPhotoPath!.startsWith('http') ? NetworkImage(currentPhotoPath!) : FileImage(File(currentPhotoPath!)) as ImageProvider)
-                    : null,
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                    image: currentPhotoPath != null 
+                      ? DecorationImage(
+                          image: currentPhotoPath!.startsWith('http') 
+                            ? NetworkImage(currentPhotoPath!) 
+                            : FileImage(File(currentPhotoPath!)) as ImageProvider,
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                  ),
                   child: currentPhotoPath == null ? const Icon(Icons.person, size: 50, color: Color(0xFF94A3B8)) : null,
                 ),
                 Positioned(

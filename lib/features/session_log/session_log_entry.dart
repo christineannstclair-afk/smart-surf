@@ -200,7 +200,7 @@ class SessionLogEntry {
       aiFocusTagEn: json['aiFocusTagEn'] as String?,
       aiFocusTagEs: json['aiFocusTagEs'] as String?,
       isCompleted: json['isCompleted'] as bool? ?? true,
-      mediaPath: json['mediaPath'] as String?,
+      mediaPath: json['mediaPath'] as String? ?? json['mediaUrl'] as String?,
       mediaType: json['mediaType'] as String?,
       waveLocation: json['waveLocation'] as String?,
       email: json['email'] as String?,

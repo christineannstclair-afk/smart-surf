@@ -1,4 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
+import '../session_log/firebase_service.dart';
+import '../../ui_system/app_theme.dart';
+
 
 class ProfileInfoEditSheet extends StatefulWidget {
   final bool isSpanish;
@@ -9,6 +15,8 @@ class ProfileInfoEditSheet extends StatefulWidget {
   final String age;
   final String surferSummary;
   final String displayName;
+  final String? profilePhotoPath;
+
 
   final bool stanceVisibleToCoach;
   final bool stanceVisibleOnDashboard;
@@ -39,6 +47,8 @@ class ProfileInfoEditSheet extends StatefulWidget {
     required bool locationVisibleOnDashboard,
     required bool ageVisibleToCoach,
     required bool ageVisibleOnDashboard,
+    required String? profilePhotoPath,
+
   }) onUpdate;
 
   const ProfileInfoEditSheet({
@@ -51,6 +61,8 @@ class ProfileInfoEditSheet extends StatefulWidget {
     required this.age,
     required this.surferSummary,
     required this.displayName,
+    this.profilePhotoPath,
+
     required this.stanceVisibleToCoach,
     required this.stanceVisibleOnDashboard,
     required this.heightVisibleToCoach,
@@ -73,6 +85,8 @@ class ProfileInfoEditSheet extends StatefulWidget {
     required String age,
     required String surferSummary,
     required String displayName,
+    String? profilePhotoPath,
+
     required bool stanceVisibleToCoach,
     required bool stanceVisibleOnDashboard,
     required bool heightVisibleToCoach,
@@ -101,6 +115,8 @@ class ProfileInfoEditSheet extends StatefulWidget {
       required bool locationVisibleOnDashboard,
       required bool ageVisibleToCoach,
       required bool ageVisibleOnDashboard,
+      required String? profilePhotoPath,
+
     }) onUpdate,
   }) {
     showModalBottomSheet(
@@ -120,6 +136,8 @@ class ProfileInfoEditSheet extends StatefulWidget {
         age: age,
         surferSummary: surferSummary,
         displayName: displayName,
+        profilePhotoPath: profilePhotoPath,
+
         stanceVisibleToCoach: stanceVisibleToCoach,
         stanceVisibleOnDashboard: stanceVisibleOnDashboard,
         heightVisibleToCoach: heightVisibleToCoach,
@@ -146,6 +164,8 @@ class _ProfileInfoEditSheetState extends State<ProfileInfoEditSheet> {
   late TextEditingController ageCtrl;
   late TextEditingController summaryCtrl;
   late TextEditingController nameCtrl;
+  String? currentPhotoPath;
+
   
   late String currentStance;
 
@@ -169,6 +189,8 @@ class _ProfileInfoEditSheetState extends State<ProfileInfoEditSheet> {
     ageCtrl = TextEditingController(text: widget.age);
     summaryCtrl = TextEditingController(text: widget.surferSummary);
     nameCtrl = TextEditingController(text: widget.displayName);
+    currentPhotoPath = widget.profilePhotoPath;
+
     
     currentStance = widget.stance;
 
@@ -183,6 +205,60 @@ class _ProfileInfoEditSheetState extends State<ProfileInfoEditSheet> {
     ageVisibleToCoach = widget.ageVisibleToCoach;
     ageVisibleOnDashboard = widget.ageVisibleOnDashboard;
   }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 100);
+    if (picked != null) {
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: widget.isSpanish ? 'Recortar Foto' : 'Crop Photo',
+            toolbarColor: const Color(0xFF0F172A),
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(
+            title: widget.isSpanish ? 'Recortar Foto' : 'Crop Photo',
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+            doneButtonTitle: widget.isSpanish ? 'Hecho' : 'Done',
+            cancelButtonTitle: widget.isSpanish ? 'Cancelar' : 'Cancel',
+          ),
+        ],
+      );
+
+      if (croppedFile != null) {
+        // 1. Show loading
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Uploading photo..."), duration: Duration(seconds: 1)),
+          );
+        }
+        
+        // 2. Upload
+        final fbResult = await FirebaseService().uploadMedia(
+          localPath: croppedFile.path,
+          isProfile: true,
+          isVideo: false,
+        );
+
+        if (fbResult != null && fbResult.success) {
+          setState(() => currentPhotoPath = fbResult.url);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("Upload failed: ${fbResult?.errorCode ?? 'unknown'}")),
+            );
+          }
+        }
+      }
+    }
+  }
+
 
   String _t(String en, String es) => widget.isSpanish ? es : en;
 
@@ -246,6 +322,43 @@ class _ProfileInfoEditSheetState extends State<ProfileInfoEditSheet> {
                 ),
               ),
               const SizedBox(height: 24),
+              Center(
+                child: GestureDetector(
+                  onTap: _pickImage,
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          shape: BoxShape.circle,
+                          image: currentPhotoPath != null 
+                            ? DecorationImage(
+                                image: currentPhotoPath!.startsWith('http') 
+                                  ? NetworkImage(currentPhotoPath!) 
+                                  : FileImage(File(currentPhotoPath!)) as ImageProvider,
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                        ),
+                        child: currentPhotoPath == null ? const Icon(Icons.person, size: 50, color: Color(0xFF94A3B8)) : null,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(color: Color(0xFF0F172A), shape: BoxShape.circle),
+                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
               Text(
                 _t("Toggle what you want visible on your surf passport", "Activa lo que quieras que sea visible en tu pasaporte de surf"),
                 style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w600),
@@ -347,7 +460,9 @@ class _ProfileInfoEditSheetState extends State<ProfileInfoEditSheet> {
                       locationVisibleOnDashboard: locationVisibleOnDashboard,
                       ageVisibleToCoach: ageVisibleToCoach,
                       ageVisibleOnDashboard: ageVisibleOnDashboard,
+                      profilePhotoPath: currentPhotoPath,
                     );
+
                     Navigator.pop(context);
                   },
                   style: FilledButton.styleFrom(

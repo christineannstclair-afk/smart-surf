@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 
 import '../../core/permission_service.dart';
 import '../../core/translation_service.dart';
@@ -140,15 +141,39 @@ Future<void> _pickImage() async {
 
   if (picked == null) return;
 
+  // Add cropping step
+  final croppedFile = await ImageCropper().cropImage(
+    sourcePath: picked.path,
+    aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+    uiSettings: [
+      AndroidUiSettings(
+        toolbarTitle: t("onboarding_crop_photo", "Crop Photo"),
+        toolbarColor: const Color(0xFF0F172A),
+        toolbarWidgetColor: Colors.white,
+        initAspectRatio: CropAspectRatioPreset.square,
+        lockAspectRatio: true,
+      ),
+      IOSUiSettings(
+        title: t("onboarding_crop_photo", "Crop Photo"),
+        aspectRatioLockEnabled: true,
+        resetAspectRatioEnabled: false,
+        doneButtonTitle: t("Done", "Hecho"),
+        cancelButtonTitle: t("Cancel", "Cancelar"),
+      ),
+    ],
+  );
+
+  if (croppedFile == null) return;
+
   setState(() => _isUploadingPhoto = true);
 
   Uint8List? bytes;
   if (kIsWeb) {
-    bytes = await picked.readAsBytes();
+    bytes = await croppedFile.readAsBytes();
   }
 
   final fbResult = await FirebaseService().uploadMedia(
-    localPath: picked.path,
+    localPath: croppedFile.path,
     isProfile: true,
     isVideo: false,
     webBytes: bytes,

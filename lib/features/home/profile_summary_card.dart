@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/permission_service.dart';
 import '../../ui_system/app_card.dart';
@@ -204,23 +205,47 @@ class ProfileSummaryCardState extends State<ProfileSummaryCard> {
         imageQuality: 80,
       );
 
-      if (picked != null) {
-        setState(() => _debugStatus = "Picker: Image selected (${picked.name}).");
-        final bytesCount = kIsWeb ? (await picked.readAsBytes()).length : -1;
-        debugPrint("Profile: Image picked. Path: ${picked.path}, Name: ${picked.name}, Mime: ${picked.mimeType}, Size: $bytesCount bytes (web)");
+      if (picked == null) return;
+
+      // Add cropping step
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: _t("Crop Photo", "Recortar Foto"),
+            toolbarColor: const Color(0xFF0F172A),
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(
+            title: _t("Crop Photo", "Recortar Foto"),
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+            doneButtonTitle: _t("Done", "Hecho"),
+            cancelButtonTitle: _t("Cancel", "Cancelar"),
+          ),
+        ],
+      );
+
+      if (croppedFile != null) {
+        setState(() => _debugStatus = "Picker: Image selected (${croppedFile.path}).");
+        final bytesCount = kIsWeb ? (await croppedFile.readAsBytes()).length : -1;
+        debugPrint("Profile: Image picked. Path: ${croppedFile.path}, Size: $bytesCount bytes (web)");
         setState(() => _debugStatus = "Uploading ${bytesCount > 0 ? bytesCount : ''} bytes...");
         
         String? pathToSave;
         Uint8List? bytes;
         if (kIsWeb) {
           setState(() => _debugStatus = "Web: Reading file bytes...");
-          bytes = await picked.readAsBytes();
+          bytes = await croppedFile.readAsBytes();
           setState(() => _debugStatus = "Web: Bytes read (${bytes?.length}). Initializing Firebase Upload...");
         }
 
         debugPrint("Profile: Calling FirebaseService().uploadMedia... UID: ${FirebaseService().currentUid}");
         final fbResult = await FirebaseService().uploadMedia(
-            localPath: picked.path,
+            localPath: croppedFile.path,
             isProfile: true,
             isVideo: false,
             webBytes: bytes,
@@ -367,13 +392,16 @@ class ProfileSummaryCardState extends State<ProfileSummaryCard> {
         children: [
           Stack(
             children: [
-              CircleAvatar(
-                radius: 32,
-                backgroundColor: AppTheme.surfaceVariant,
-                backgroundImage: profileImage,
-                onBackgroundImageError: profileImage != null
-                    ? (exception, stackTrace) => debugPrint("Profile photo error: $exception")
-                    : null,
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceVariant,
+                  shape: BoxShape.circle,
+                  image: profileImage != null 
+                      ? DecorationImage(image: profileImage, fit: BoxFit.cover)
+                      : null,
+                ),
                 child: profileImage == null
                     ? const Icon(Icons.person, size: 32, color: AppTheme.primary)
                     : null,

@@ -122,11 +122,22 @@ class _SurfPassportEditSheetState extends State<SurfPassportEditSheet> {
           items: PassportPresets.levels,
           currentEn: currentLevel,
           onSelected: (m) {
-            setState(() {
-              currentLevel = m["enTitle"]!;
-              currentLevelDesc = m["enDesc"]!;
-              _currentView = _EditSheetView.main;
-            });
+            if (widget.initialAction != null) {
+              widget.onUpdate(
+                levelEnTitle: m["enTitle"]!,
+                levelEnDesc: m["enDesc"]!,
+                comfortEn: currentComfort,
+                boardEn: currentBoard,
+                focusEn: currentFocus,
+              );
+              Navigator.pop(context);
+            } else {
+              setState(() {
+                currentLevel = m["enTitle"]!;
+                currentLevelDesc = m["enDesc"]!;
+                _currentView = _EditSheetView.main;
+              });
+            }
           },
         );
       case _EditSheetView.comfort:
@@ -135,10 +146,21 @@ class _SurfPassportEditSheetState extends State<SurfPassportEditSheet> {
           items: PassportPresets.comfortZones,
           currentEn: currentComfort,
           onSelected: (m) {
-            setState(() {
-              currentComfort = m["en"]!;
-              _currentView = _EditSheetView.main;
-            });
+            if (widget.initialAction != null) {
+              widget.onUpdate(
+                levelEnTitle: currentLevel,
+                levelEnDesc: currentLevelDesc,
+                comfortEn: m["en"]!,
+                boardEn: currentBoard,
+                focusEn: currentFocus,
+              );
+              Navigator.pop(context);
+            } else {
+              setState(() {
+                currentComfort = m["en"]!;
+                _currentView = _EditSheetView.main;
+              });
+            }
           },
         );
       case _EditSheetView.board:
@@ -147,10 +169,21 @@ class _SurfPassportEditSheetState extends State<SurfPassportEditSheet> {
           items: PassportPresets.boards,
           currentEn: currentBoard,
           onSelected: (m) {
-            setState(() {
-              currentBoard = m["en"]!;
-              _currentView = _EditSheetView.main;
-            });
+            if (widget.initialAction != null) {
+              widget.onUpdate(
+                levelEnTitle: currentLevel,
+                levelEnDesc: currentLevelDesc,
+                comfortEn: currentComfort,
+                boardEn: m["en"]!,
+                focusEn: currentFocus,
+              );
+              Navigator.pop(context);
+            } else {
+              setState(() {
+                currentBoard = m["en"]!;
+                _currentView = _EditSheetView.main;
+              });
+            }
           },
         );
       case _EditSheetView.focus:
@@ -299,7 +332,13 @@ class _SurfPassportEditSheetState extends State<SurfPassportEditSheet> {
           Row(
             children: [
               IconButton(
-                onPressed: () => setState(() => _currentView = _EditSheetView.main),
+                onPressed: () {
+                  if (widget.initialAction != null) {
+                    Navigator.pop(context);
+                  } else {
+                    setState(() => _currentView = _EditSheetView.main);
+                  }
+                },
                 icon: const Icon(Icons.arrow_back),
               ),
               Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
@@ -348,7 +387,13 @@ class _SurfPassportEditSheetState extends State<SurfPassportEditSheet> {
             Row(
               children: [
                 IconButton(
-                  onPressed: () => setState(() => _currentView = _EditSheetView.main),
+                  onPressed: () {
+                    if (widget.initialAction != null) {
+                      Navigator.pop(context);
+                    } else {
+                      setState(() => _currentView = _EditSheetView.main);
+                    }
+                  },
                   icon: const Icon(Icons.arrow_back),
                 ),
                 Text(_t("Focus Skills (Max 4)", "Habilidades Foco (Max 4)"), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
@@ -397,10 +442,21 @@ class _SurfPassportEditSheetState extends State<SurfPassportEditSheet> {
                 height: 56,
                 child: FilledButton(
                   onPressed: () {
-                    setState(() {
-                      currentFocus = tempFocus;
-                      _currentView = _EditSheetView.main;
-                    });
+                    if (widget.initialAction != null) {
+                      widget.onUpdate(
+                        levelEnTitle: currentLevel,
+                        levelEnDesc: currentLevelDesc,
+                        comfortEn: currentComfort,
+                        boardEn: currentBoard,
+                        focusEn: tempFocus,
+                      );
+                      Navigator.pop(context);
+                    } else {
+                      setState(() {
+                        currentFocus = tempFocus;
+                        _currentView = _EditSheetView.main;
+                      });
+                    }
                   },
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF0F172A),

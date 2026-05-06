@@ -212,7 +212,7 @@ class SurfPassportScreenState extends State<SurfPassportScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0D9488), // Teal
+                            color: AppTheme.primary, 
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Column(
@@ -364,13 +364,16 @@ class SurfPassportScreenState extends State<SurfPassportScreen> {
                   children: [
                     Row(
                       children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor: const Color(0xFF334155),
-                          backgroundImage: profileImage,
-                          onBackgroundImageError: profileImage != null
-                              ? (exception, stackTrace) => debugPrint("Profile photo error: $exception")
-                              : null,
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF334155),
+                            shape: BoxShape.circle,
+                            image: profileImage != null 
+                                ? DecorationImage(image: profileImage, fit: BoxFit.cover)
+                                : null,
+                          ),
                           child: profileImage == null 
                             ? const Icon(Icons.person, size: 30, color: Colors.white24) 
                             : null,
@@ -786,6 +789,7 @@ class SurfPassportScreenState extends State<SurfPassportScreen> {
       age: widget.age,
       surferSummary: widget.surferSummary,
       displayName: widget.displayName,
+      profilePhotoPath: widget.profilePhotoPath,
       stanceVisibleToCoach: widget.stanceVisibleToCoach,
       stanceVisibleOnDashboard: widget.stanceVisibleOnDashboard,
       heightVisibleToCoach: widget.heightVisibleToCoach,
@@ -814,6 +818,7 @@ class SurfPassportScreenState extends State<SurfPassportScreen> {
         required bool locationVisibleOnDashboard,
         required bool ageVisibleToCoach,
         required bool ageVisibleOnDashboard,
+        required String? profilePhotoPath,
       }) {
         widget.onUpdate(
           stance: stance,
@@ -828,7 +833,7 @@ class SurfPassportScreenState extends State<SurfPassportScreen> {
           boardEn: widget.boardEn,
           focusEn: widget.focusEn,
           displayName: displayName,
-          profilePhotoPath: widget.profilePhotoPath,
+          profilePhotoPath: profilePhotoPath,
           stanceVisibleToCoach: stanceVisibleToCoach,
           stanceVisibleOnDashboard: stanceVisibleOnDashboard,
           heightVisibleToCoach: heightVisibleToCoach,
@@ -1026,12 +1031,10 @@ class _InfoBlock extends StatelessWidget {
             ],
           ),
           if (onEdit != null)
-            Positioned(
-              top: -4,
-              right: -4,
-              child: IgnorePointer(
-                child: Icon(Icons.edit_outlined, size: 16, color: Colors.white.withOpacity(0.35)),
-              ),
+            const Positioned(
+              top: 14,
+              right: 14,
+              child: Icon(Icons.edit_outlined, size: 14, color: Colors.white24),
             ),
         ],
       ),

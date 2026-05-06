@@ -134,16 +134,25 @@ class MediaCard extends StatelessWidget {
 
   Widget _buildMediaContent(BuildContext context) {
      if (mediaPath == null) return _buildErrorPlaceholder();
-
+ 
      if (mediaType == 'video') {
        return _VideoThumbnailPlayer(path: mediaPath!);
      }
-
-     return Image.network(
-       mediaPath!,
-       fit: BoxFit.cover,
-       errorBuilder: (ctx, err, stack) => _buildErrorPlaceholder(),
-     );
+ 
+     final bool isNetwork = mediaPath!.startsWith('http');
+     if (isNetwork) {
+       return Image.network(
+         mediaPath!,
+         fit: BoxFit.cover,
+         errorBuilder: (ctx, err, stack) => _buildErrorPlaceholder(),
+       );
+     } else {
+       return Image.file(
+         File(mediaPath!),
+         fit: BoxFit.cover,
+         errorBuilder: (ctx, err, stack) => _buildErrorPlaceholder(),
+       );
+     }
   }
 
   Widget _buildErrorPlaceholder() {

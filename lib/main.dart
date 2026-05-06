@@ -234,12 +234,18 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
   }
 
   String? get _latestMediaPath {
-    final s = _latestLoggedSession;
-    return s?.mediaPath;
+    try {
+      return _sessionLogs.firstWhere((s) => s.mediaPath != null).mediaPath;
+    } catch (_) {
+      return null;
+    }
   }
   String? get _latestMediaType {
-    final s = _latestLoggedSession;
-    return s?.mediaType;
+    try {
+      return _sessionLogs.firstWhere((s) => s.mediaPath != null).mediaType;
+    } catch (_) {
+      return null;
+    }
   }
 
   String _t(String en, String es) => _isSpanish ? es : en;
@@ -386,6 +392,7 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       } else {
         _sessionLogs.insert(0, entry);
       }
+      _sessionLogs.sort((a, b) => b.date.compareTo(a.date));
 
       if (showBanner) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -396,8 +403,6 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
           ),
         );
       }
-      
-
 
       // Objective 4: Auto-Add Logged Surf Spot to Map
       if (entry.isCompleted && entry.spotName.isNotEmpty && entry.spotName != (_isSpanish ? "Sesión Actual" : "Current Session")) {
@@ -407,7 +412,7 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
             id: DateTime.now().millisecondsSinceEpoch.toString(),
             name: entry.spotName,
             region: entry.countryOrRegion,
-            lat: 0.0, // Default to 0.0, user can edit location later
+            lat: 0.0, 
             lng: 0.0,
             createdAt: DateTime.now(),
           );
@@ -714,6 +719,12 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         hasSeenLogPulse: false,
         hasSeenPostFirstSessionPassportPrompt: false,
         hasSeenPostPassportProfilePrompt: false,
+        isCoachPro: false,
+        isSurferPro: false,
+        isSurferTrial: false,
+        insightsViewedCount: 0,
+        surferProPopupSuppressedUntil: 0,
+        lastNudgeShownAt: 0,
       );
     });
 
