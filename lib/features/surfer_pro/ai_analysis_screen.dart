@@ -183,25 +183,7 @@ setState(() => _currentStep = 3);
     });
 
     try {
-      // CLIENT-SIDE SHIELD: Check local usage before expensive API/Token spend
-      final localCount = await AppStorage.getAiUsageCount();
-      debugPrint("AiAnalysis: Local usage count: $localCount/3");
-      if (localCount >= 3) {
-        if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(t(
-                "Daily insight limit reached. You can generate up to 3 insights per day.", 
-                "Daily insight limit reached. You can generate up to 3 insights per day."
-              )),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        setState(() => _currentStep = 3); // back to questions
-        return;
-      }
-
+      debugPrint("AiAnalysis: Requesting video analysis...");
       final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
       if (idToken == null) {
         throw Exception("Authentication required for AI analysis");

@@ -97,14 +97,16 @@ class _SurferProUpgradeContentState extends State<SurferProUpgradeContent> {
       return;
     }
 
-    if (!widget.isSurferPro) {
+    // Milestone Check: If free and already has a reflection with AI, block.
+    final bool hasExistingAI = widget.reflections.any((r) => r.aiSummary.isNotEmpty);
+    if (!widget.isSurferPro && hasExistingAI) {
       if (mounted) {
         Navigator.pop(context); // Close modal
-        openSurferProPaywall(context, source: 'surfer_pro_reflection_form', isSpanish: widget.isSpanish);
+        openSurferProPaywall(context, source: 'surfer_pro_reflection_form_blocked', isSpanish: widget.isSpanish);
       }
       return;
     }
-
+    
     setState(() => _isGenerating = true);
     
     String? finalSummary;

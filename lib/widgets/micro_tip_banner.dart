@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../ui_system/app_theme.dart';
 
 /// A one-time dismissible tip banner.
 /// Shows itself only the first time until [prefKey] is set to true.
@@ -72,53 +73,68 @@ class _MicroTipBannerState extends State<MicroTipBanner> {
   Widget build(BuildContext context) {
     if (!_loaded || !_visible) return const SizedBox.shrink();
 
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFE0F7F9), // Light Seafoam tint
+        color: AppTheme.primary.withOpacity(0.05), 
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
         border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          color: AppTheme.primary.withOpacity(0.1),
           width: 1,
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.lightbulb_outline_rounded,
-            size: 20,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              widget.message,
-              style: const TextStyle(
-                fontSize: 14,
-                height: 1.4,
-                color: Colors.black87,
-              ),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(
+              Icons.lightbulb_outline_rounded,
+              size: 20,
+              color: AppTheme.primary.withOpacity(0.6),
             ),
           ),
           const SizedBox(width: 12),
-          GestureDetector(
-            onTap: _dismiss,
-            child: Text(
-              widget.dismissLabel ?? 'Got it',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.message,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _dismiss,
+                    style: TextButton.styleFrom(
+                      foregroundColor: colorScheme.primary,
+                      backgroundColor: colorScheme.primary.withOpacity(0.08),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      widget.dismissLabel ?? 'Got it',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

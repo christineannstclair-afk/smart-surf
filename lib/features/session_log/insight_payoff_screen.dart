@@ -4,6 +4,7 @@ import '../../ui_system/spacing.dart';
 import '../../ui_system/app_card.dart';
 import 'session_log_entry.dart';
 import '../../core/translation_service.dart';
+import '../../widgets/helper_info_card.dart';
 
 class InsightPayoffScreen extends StatelessWidget {
   final bool isSpanish;
@@ -151,34 +152,11 @@ class InsightPayoffScreen extends StatelessWidget {
   }
 
   Widget _buildNudgeCard(BuildContext context, String message) {
-    return GestureDetector(
+    return HelperInfoCard(
+      message: message,
       onTap: onNudgeTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppTheme.secondary.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.secondary.withOpacity(0.2)),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.lightbulb_outline, color: AppTheme.secondary),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
-                  height: 1.4,
-                ),
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: AppTheme.secondary, size: 20),
-          ],
-        ),
-      ),
+      showDismissButton: false,
+      margin: EdgeInsets.zero,
     );
   }
 

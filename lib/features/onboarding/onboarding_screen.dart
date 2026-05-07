@@ -408,7 +408,7 @@ SnackBar(content: Text('Apple sign-in failed: $e')),
         );
       }
 
-      FirebaseService().logEvent('sign_in_email', parameters: {'is_new': !isLogin});
+      FirebaseService().logEvent('sign_in_email', parameters: {'is_new': !isLogin ? 1 : 0});
 
     if (!mounted) return;
     setState(() => _isSigningIn = false);

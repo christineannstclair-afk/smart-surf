@@ -124,8 +124,8 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       hasSeenWelcomeGuide: false,
       appVersion: '1.0.1'
     ));
-    if (mounted && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    if (mounted) {
+      _messengerKey.currentState?.showSnackBar(
         SnackBar(
           content: Text(_isSpanish ? 'Onboarding reiniciado.' : 'Smart Surf reset!'),
           behavior: SnackBarBehavior.floating,
@@ -395,7 +395,7 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       _sessionLogs.sort((a, b) => b.date.compareTo(a.date));
 
       if (showBanner) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        _messengerKey.currentState?.showSnackBar(
           SnackBar(
             content: Text(_isSpanish ? "Sesión registrada" : "Session logged"),
             duration: const Duration(seconds: 1),
@@ -528,26 +528,159 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
             ? "Daily insight limit reached. You can generate up to 3 insights per day."
             : "Daily insight limit reached. You can generate up to 3 insights per day.";
         }
-        ScaffoldMessenger.of(context).showSnackBar(
+        _messengerKey.currentState?.showSnackBar(
           SnackBar(content: Text(message)),
         );
       }
       return null;
     }
   }
-
   Future<SessionLogEntry?> _generateInsight(SessionLogEntry session) async {
-    debugPrint("🤖 AI Insight: Request started for session ${session.id}");
+    final String userId = FirebaseAuth.instance.currentUser?.uid ?? "unknown";
+    final String utcDayKey = DateTime.now().toUtc().toIso8601String().split('T')[0];
+    final bool hasExisting = (session.aiSummaryEn?.isNotEmpty == true) || (session.aiSummary?.isNotEmpty == true);
+    
+    debugPrint("--- [PaywallGate] ---");
+    debugPrint("[PaywallGate] Session ID: ${session.id}");
+    debugPrint("[PaywallGate] hasExisting: $hasExisting");
+    debugPrint("[PaywallGate] usedFirstFree: ${_settings.hasUsedFirstFreeAIInsight}");
+    
+    // 1. If it's an existing insight, we always allow opening it (re-opening doesn't count against limit or need pro)
+    if (hasExisting) {
+      debugPrint("[PaywallGate] ALLOWED: Existing insight.");
+    } else {
+      // 2. Daily Limit Check (Max 3 per UTC day)
+      final dailyInfo = await FirebaseService().getDailyInsightInfo(utcDayKey);
+      final int dailyCount = dailyInfo['count'];
+      final List<dynamic> sessionIds = dailyInfo['sessionIds'];
+      
+      debugPrint("--- [DailyLimitAudit] ---");
+      debugPrint("[Limit] User ID: $userId");
+      debugPrint("[Limit] UTC Day: $utcDayKey");
+      debugPrint("[Limit] Current Count: $dailyCount");
+      debugPrint("[Limit] Sessions counted today:");
+      if (sessionIds.isEmpty && dailyCount > 0) {
+        debugPrint("  - (Legacy sessions without IDs tracked: $dailyCount)");
+      } else {
+        for (var sid in sessionIds) {
+          debugPrint("  - $sid");
+        }
+      }
+      
+      FirebaseService().logEvent('insight_limit_check', parameters: {
+        'dailyInsightCount': dailyCount,
+        'dailyLimitAllowed': dailyCount < 3 ? 1 : 0,
+        'utcDayKey': utcDayKey,
+      });
+
+      if (dailyCount >= 3) {
+        debugPrint("[Limit] BLOCKED: Daily limit of 3 reached.");
+        debugPrint("[Limit] dailyLimitReachedDetected: true");
+        _messengerKey.currentState?.showSnackBar(
+          SnackBar(
+            content: Text(_isSpanish 
+              ? "Límite diario de insights alcanzado. Puedes generar hasta 3 insights por día."
+              : "Daily insight limit reached. You can generate up to 3 insights per day."),
+            backgroundColor: AppTheme.primary,
+          ),
+        );
+        debugPrint("[Limit] snackbarShown: true");
+        debugPrint("[Limit] loadingStopped: true (via return null)");
+        return null;
+      }
+
+      // 3. Eligibility Check for NEW insights
+      debugPrint("[InsightEligibility] Checking eligibility for NEW insight...");
+      bool isEligible = false;
+      bool isPro = await SubscriptionService().isSurferProActive();
+      
+      // Log initial state
+      FirebaseService().logEvent('insight_eligibility_start', parameters: {
+        'usedFirstFree': _settings.hasUsedFirstFreeAIInsight ? "true" : "false",
+        'isPro': isPro ? "true" : "false",
+        'sessionId': session.id,
+      });
+
+      if (!_settings.hasUsedFirstFreeAIInsight) {
+        debugPrint("[InsightEligibility] ALLOWED: Using first free insight.");
+        isEligible = true;
+      } else {
+        debugPrint("[EntitlementCheck] First free used. Pro status: $isPro");
+        if (isPro) {
+          isEligible = true;
+        } else {
+          debugPrint("[PaywallGate] BLOCKED: No active Pro entitlement. Opening Paywall.");
+          if (mounted) {
+            final bool? purchaseResult = await openSurferProPaywall(
+              context, 
+              source: 'generate_insight_gate', 
+              isSpanish: _isSpanish
+            );
+            
+            final bool purchaseSuccess = purchaseResult ?? false;
+            debugPrint("[PurchaseFlow] Paywall closed. success: $purchaseSuccess");
+            
+            if (purchaseSuccess) {
+              // Re-verify entitlement after purchase
+              isPro = await SubscriptionService().isSurferProActive();
+              debugPrint("[PurchaseFlow] Entitlement active after purchase: $isPro");
+              
+              FirebaseService().logEvent('purchase_flow_result', parameters: {
+                'purchaseSuccess': "true",
+                'entitlementActiveAfterPurchase': isPro ? "true" : "false",
+                'pendingInsightSessionId': session.id,
+                'continuingPendingGeneration': isPro ? "true" : "false",
+              });
+
+              if (isPro) {
+                isEligible = true;
+                _updateSettings(_settings.copyWith(isSurferPro: true));
+              }
+            } else {
+              FirebaseService().logEvent('purchase_flow_result', parameters: {
+                'purchaseSuccess': "false",
+                'pendingInsightSessionId': session.id,
+                'continuingPendingGeneration': "false",
+              });
+            }
+          }
+        }
+      }
+
+      if (!isEligible) {
+        debugPrint("[PaywallGate] FINAL BLOCKED: User is not eligible for a new insight.");
+        return null;
+      }
+      debugPrint("[PaywallGate] FINAL ALLOWED: Proceeding to AI generation.");
+    }
+
+    final bool willGenerate = !hasExisting;
+    debugPrint("--- [DailyLimitAudit] ---");
+    debugPrint("[Limit] User ID: $userId");
+    debugPrint("[Limit] UTC Day: $utcDayKey");
+    debugPrint("[Limit] Session ID: ${session.id}");
+    debugPrint("[Limit] Existing Insight: $hasExisting");
+    debugPrint("[Limit] Will Generate New: $willGenerate");
+    
+    debugPrint("--- [AI Generation Debug] ---");
+    debugPrint("[AI Gen] Session ID: ${session.id}");
+    debugPrint("[AI Gen] User ID: ${FirebaseAuth.instance.currentUser?.uid}");
+    debugPrint("[AI Gen] Total Logs: ${_sessionLogs.length}");
+    debugPrint("[AI Gen] hasSeenWelcomeGuide: ${_settings.hasSeenWelcomeGuide}");
+    debugPrint("[AI Gen] seenFirstPrompt: ${_settings.hasSeenFirstInsightPrompt}");
+    debugPrint("[AI Gen] usedFirstFree: ${_settings.hasUsedFirstFreeAIInsight}");
+    debugPrint("[AI Gen] isPro: ${_settings.isSurferPro}");
+    
     // forceRefresh:true ensures we never send a stale cached token (avoids 401)
     final idToken = await FirebaseAuth.instance.currentUser?.getIdToken(true);
     if (idToken == null) {
-      debugPrint("🤖 AI Insight: Error - No ID token available (user not signed in)");
+      debugPrint("[AI Gen] FAILED: No ID token available (user not signed in)");
       return null;
     }
-    debugPrint("🤖 AI Insight: Token fetched — starts with: ${idToken.substring(0, 20)}...");
+    debugPrint("[AI Gen] Token fetched (starts with ${idToken.substring(0, 10)}...)");
 
     try {
-      debugPrint("🤖 AI Insight: Calling AnalyzeApi.analyzeReflection with waveSize: ${session.waveSize}, board: ${session.board}...");
+      debugPrint("[AI Gen] Calling Backend API...");
       final result = await AnalyzeApi.analyzeReflection(
         idToken: idToken,
         sessionId: session.id,
@@ -562,7 +695,8 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         board: session.board,
       );
 
-      debugPrint("🤖 AI Insight: API Response received: $result");
+      debugPrint("[AI Gen] SUCCESS: Backend responded.");
+      debugPrint("[AI Gen] Payload: $result");
 
       final updatedSession = session.copyWith(
         aiSummaryEn: result['session_insight_en'],
@@ -575,32 +709,48 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         aiFocusTagEs: result['focus_tag_es'],
       );
       
-      debugPrint("🤖 AI Insight: Parsed fields - Summary: ${updatedSession.aiSummaryEn ?? updatedSession.aiSummaryEs}, Next Focus: ${updatedSession.aiNextFocusEn ?? updatedSession.aiNextFocusEs}");
-
-      debugPrint("🤖 AI Insight: Persisting to Firestore/Storage...");
       _addSession(updatedSession);
 
-      if (!_settings.hasUsedFirstFreeAIInsight) {
-        _updateSettings(_settings.copyWith(hasUsedFirstFreeAIInsight: true));
+      if (willGenerate) {
+        if (!_settings.hasUsedFirstFreeAIInsight) {
+          debugPrint("[AI Gen] Marking first free insight as USED.");
+          _updateSettings(_settings.copyWith(hasUsedFirstFreeAIInsight: true));
+        }
+        await FirebaseService().incrementDailyInsightCount(utcDayKey, session.id);
+        debugPrint("[Limit] Daily count incremented for $utcDayKey");
       }
 
-      debugPrint("🤖 AI Insight: Persist complete.");
-      
+      debugPrint("[AI Gen] Flow complete.");
       return updatedSession;
 
     } catch (e) {
-      debugPrint("🤖 AI Insight: Error caught in _generateInsight: $e");
+      debugPrint("[AI Gen] ERROR: $e");
       if (mounted) {
-        if (e.toString().contains('DAILY_LIMIT_REACHED')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_isSpanish 
-                ? "Daily insight limit reached. You can generate up to 3 insights per day."
-                : "Daily insight limit reached. You can generate up to 3 insights per day."),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+        String errorMsg = _isSpanish ? "Ocurrió un error. Revisa tu conexión." : "An error occurred. Please check your connection.";
+        
+        if (e.toString().contains('AUTH_ERROR')) {
+          errorMsg = _isSpanish ? "Sesión expirada o inválida. Revisa tu cuenta." : "Authentication failed. ${e.toString().split('AUTH_ERROR: ').last}";
+        } else if (e.toString().contains('DAILY_LIMIT_REACHED')) {
+          debugPrint("[Limit] dailyLimitReachedDetected: true (from backend)");
+          errorMsg = _isSpanish 
+            ? "Límite de insights alcanzado. Puedes generar hasta 3 insights por día." 
+            : "Daily insight limit reached. You can generate up to 3 insights per day.";
+          debugPrint("[Limit] snackbarShown: true");
+          debugPrint("[Limit] loadingStopped: true (via return null in catch)");
+        } else if (e.toString().contains('PAYWALL_REQUIRED')) {
+          debugPrint("[AI Gen] Paywall required. Showing modal.");
+          openSurferProPaywall(context, source: 'backend_gate', isSpanish: _isSpanish);
+          return null; // Return early, don't show snackbar for paywall
+        } else if (e.toString().contains('BACKEND_ERROR')) {
+          errorMsg = _isSpanish ? "Insight no disponible en este momento." : "Insight unavailable right now.";
         }
+
+        _messengerKey.currentState?.showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
       return null;
     }
@@ -767,6 +917,16 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         
         // Delete user document
         batch.delete(FirebaseFirestore.instance.collection('users').doc(uid));
+
+        // Delete stats collection (Daily insight counters)
+        final stats = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('stats')
+            .get();
+        for (var doc in stats.docs) {
+          batch.delete(doc.reference);
+        }
         
         await batch.commit();
         await FirebaseAuth.instance.signOut();
@@ -1205,18 +1365,7 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         onUpdate: _addSession,
         onUpdateProfile: _updateProfile,
         onUnlockFirstInsight: _unlockFirstInsight,
-        onGenerateInsight: (session) async {
-          final bool isPro = _settings.isSurferPro;
-          final bool hasUsedFree = _settings.hasUsedFirstFreeAIInsight;
-
-          if (!isPro && hasUsedFree) {
-            debugPrint("🤖 AI Insight: Access Denied. User is not Pro and has used free insight.");
-            openSurferProPaywall(context, source: 'generate_insight_blocked', isSpanish: _isSpanish);
-            return null;
-          }
-          
-          return await _generateInsight(session);
-        },
+        onGenerateInsight: (session) async => await _generateInsight(session),
         onInsightViewed: () {
           if (!_settings.isSurferPro) {
             final newCount = _settings.insightsViewedCount + 1;
@@ -1267,7 +1416,20 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         hasSeenFirstInsightPrompt: _settings.hasSeenFirstInsightPrompt,
         onInsightPromptSeen: () => _updateSettings(_settings.copyWith(hasSeenFirstInsightPrompt: true)),
         hasUsedFirstFreeAIInsight: _settings.hasUsedFirstFreeAIInsight,
-        onFirstFreeAIInsightUsed: () => _updateSettings(_settings.copyWith(hasUsedFirstFreeAIInsight: true)),
+        onFirstFreeAIInsightUsed: () {
+          _updateSettings(_settings.copyWith(hasUsedFirstFreeAIInsight: true));
+          if (!_settings.isSurferPro) {
+            // Show the nudge immediately after they've closed their first free insight payoff
+            _showSurferProUpgradePrompt(
+              context,
+              title: _isSpanish ? "¡Increíble insight!" : "Killer insight!",
+              content: _isSpanish 
+                ? "Obtén feedback personalizado después de cada sesión con Surfer Pro." 
+                : "Get personalized feedback after every single session with Surfer Pro.",
+              isSoftUpsell: true,
+            );
+          }
+        },
         lastNudgeShownAt: _settings.lastNudgeShownAt,
         onSurferProNudgeSeen: (count) {
           _updateSettings(_settings.copyWith(lastNudgeShownAt: count));

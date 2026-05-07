@@ -3,7 +3,7 @@ import 'package:latlong2/latlong.dart';
 import '../session_log/firebase_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../widgets/micro_tip_banner.dart';
+import '../../widgets/helper_info_card.dart';
 import '../../widgets/language_menu.dart';
 
 import 'surf_spots_data.dart';
@@ -171,16 +171,17 @@ top: true,
 bottom: false,
 child: Column(
 children: [
-MicroTipBanner(
-  prefKey: 'hasSeenMapTip',
-  visible: !widget.hasSeenMapTip,
-  onDismiss: widget.onMapTipDismissed,
-  message: _t(
-    "Save surf spots you want to remember.\nSearch or tap Add Spot to get started.",
-    "Guarda los spots de surf que quieras recordar.\nBusca o toca Agregar Spot para comenzar.",
-  ),
-  dismissLabel: _t('Got it', 'Entendido'),
-),
+                const SizedBox(height: 16),
+                HelperInfoCard(
+                  prefKey: 'hasSeenMapTip',
+                  visible: !widget.hasSeenMapTip,
+                  onDismiss: widget.onMapTipDismissed,
+                  message: _t(
+                    "Save surf spots you want to remember.\nSearch or tap Add Spot to get started.",
+                    "Guarda los spots de surf que quieras recordar.\nBusca o toca Agregar Spot para comenzar.",
+                  ),
+                  dismissLabel: _t('Got it', 'Entendido'),
+                ),
 Expanded(
 child: isWide ? _buildWideLayout(spots) : _buildMobileLayout(spots),
 ),

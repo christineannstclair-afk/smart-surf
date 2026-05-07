@@ -15,7 +15,7 @@ import '../../core/permission_service.dart';
 import 'package:smart_surf/features/session_log/session_log_entry.dart';
 import 'package:smart_surf/features/passport/passport_presets.dart';
 import 'package:smart_surf/features/home/video_preview_modal.dart';
-import 'package:smart_surf/widgets/micro_tip_banner.dart';
+import 'package:smart_surf/widgets/helper_info_card.dart';
 import 'package:smart_surf/models/ai_analysis_model.dart';
 import 'package:smart_surf/widgets/orientation_prompt.dart';
 import 'package:smart_surf/features/Settings/settings_models.dart';
@@ -515,6 +515,7 @@ class SessionLogScreenState extends State<SessionLogScreen> {
   Future<SessionLogEntry?> openAddSessionSheet({SessionLogEntry? existing, int startStep = 0, bool skipSuccessScreen = false}) async {
     if (_isSheetOpening) return null;
     setState(() => _isSheetOpening = true);
+    final int countBefore = widget.logs.length;
     final sessionId = existing?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
     int currentStep = startStep; 
 
@@ -594,9 +595,10 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                               ),
                               const SizedBox(height: 16),
                               DropdownButtonFormField<String>(
+                                isExpanded: true,
                                 value: SurfConstants.waveHeightOptions.any((m) => m["en"] == waveSize) ? waveSize : null,
                                 decoration: InputDecoration(labelText: t("Wave Height", "Tamaño de ola"), border: const OutlineInputBorder()),
-                                items: SurfConstants.waveHeightOptions.map((m) => DropdownMenuItem(value: m["en"]!, child: Text(t(m["en"]!, m["es"]!)))).toList(),
+                                items: SurfConstants.waveHeightOptions.map((m) => DropdownMenuItem(value: m["en"]!, child: Text(t(m["en"]!, m["es"]!), overflow: TextOverflow.ellipsis))).toList(),
                                 onChanged: (v) => setSheetState(() => waveSize = v ?? waveSize),
                               ),
                               const SizedBox(height: 16),
@@ -616,9 +618,10 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                               ),
                               const SizedBox(height: 16),
                               DropdownButtonFormField<String>(
+                                isExpanded: true,
                                 value: SurfConstants.boardOptions.any((m) => m["en"] == board) ? board : null,
                                 decoration: InputDecoration(labelText: t("Board", "Tabla"), border: const OutlineInputBorder()),
-                                items: SurfConstants.boardOptions.map((m) => DropdownMenuItem(value: m["en"]!, child: Text(t(m["en"]!, m["es"]!)))).toList(),
+                                items: SurfConstants.boardOptions.map((m) => DropdownMenuItem(value: m["en"]!, child: Text(t(m["en"]!, m["es"]!), overflow: TextOverflow.ellipsis))).toList(),
                                 onChanged: (v) => setSheetState(() => board = v ?? board),
                               ),
                               const SizedBox(height: 16),
@@ -632,9 +635,10 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                               ),
                               const SizedBox(height: 16),
                               DropdownButtonFormField<String>(
+                                isExpanded: true,
                                 value: SurfConstants.conditionOptions.any((m) => m["en"] == selectedConditions) ? selectedConditions : null,
                                 decoration: InputDecoration(labelText: t("Conditions", "Condiciones"), border: const OutlineInputBorder()),
-                                items: SurfConstants.conditionOptions.map((m) => DropdownMenuItem(value: m["en"]!, child: Text(t(m["en"]!, m["es"]!)))).toList(),
+                                items: SurfConstants.conditionOptions.map((m) => DropdownMenuItem(value: m["en"]!, child: Text(t(m["en"]!, m["es"]!), overflow: TextOverflow.ellipsis))).toList(),
                                 onChanged: (v) => setSheetState(() => selectedConditions = v ?? selectedConditions),
                               ),
                               const SizedBox(height: 24),
@@ -713,41 +717,43 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                             width: double.infinity,
                             height: 56,
                             child: FilledButton(
-                              onPressed: () async {
-                                final bool isEditingMilestone = existing != null && widget.logs.length >= 3;
-                                final bool isProAndMature = widget.isSurferPro && widget.logs.length >= 4;
-                                
-                                if (isEditingMilestone || isProAndMature) {
-                                  setSheetState(() => currentStep = 1);
-                                } else {
-                                  setSheetState(() => _isSubmitting = true);
-                                  final entry = SessionLogEntry(
-                                    id: sessionId,
-                                    date: selectedDate,
-                                    spotName: spotCtrl.text.isEmpty ? t("Location not specified", "Ubicación no especificada") : spotCtrl.text,
-                                    countryOrRegion: regionCtrl.text,
-                                    waveSize: waveSize,
-                                    sessionFocus: selectedFocus,
-                                    board: board,
-                                    durationMins: durationMins,
-                                    rating: rating,
-                                    notes: focusCtrl.text.trim(),
-                                    isCompleted: true,
-                                    mediaPath: mediaPath,
-                                    mediaType: mediaType,
-                                    waveCount: int.tryParse(waveCountCtrl.text),
-                                    reflectionConditions: selectedConditions,
-                                  );
-                                  widget.onAdd(entry);
-                                  Navigator.pop(ctx, entry);
-                                }
-                              },
-                              child: Text(
-                                ((existing != null && widget.logs.length >= 3) || (widget.isSurferPro && widget.logs.length >= 4))
-                                  ? t("Continue to Reflection", "Continuar a la Reflexión")
-                                  : t("Save session", "Guardar sesión"),
-                                style: const TextStyle(fontWeight: FontWeight.w900)
-                              ),
+                                onPressed: () async {
+                                  // --- MILESTONE DEBUGGING ---
+                                  final int currentLogs = widget.logs.length;
+                                  // MILSTONE GATE:
+                                  final bool canProceedToReflection = widget.isSurferPro && widget.logs.length >= 3;
+                                  
+                                  if (canProceedToReflection) {
+                                    setSheetState(() => currentStep = 1);
+                                  } else {
+                                    setSheetState(() => _isSubmitting = true);
+                                    final entry = SessionLogEntry(
+                                      id: sessionId,
+                                      date: selectedDate,
+                                      spotName: spotCtrl.text.isEmpty ? t("Location not specified", "Ubicación no especificada") : spotCtrl.text,
+                                      countryOrRegion: regionCtrl.text,
+                                      waveSize: waveSize,
+                                      sessionFocus: selectedFocus,
+                                      board: board,
+                                      durationMins: durationMins,
+                                      rating: rating,
+                                      notes: focusCtrl.text.trim(),
+                                      isCompleted: true,
+                                      mediaPath: mediaPath,
+                                      mediaType: mediaType,
+                                      waveCount: int.tryParse(waveCountCtrl.text),
+                                      reflectionConditions: selectedConditions,
+                                    );
+                                    widget.onAdd(entry);
+                                    Navigator.pop(ctx, entry);
+                                  }
+                                },
+                                child: Text(
+                                  (widget.isSurferPro && widget.logs.length >= 3)
+                                    ? t("Continue to Reflection", "Continuar a la Reflexión")
+                                    : t("Save session", "Guardar sesión"),
+                                  style: const TextStyle(fontWeight: FontWeight.w900)
+                                ),
                             ),
                           ),
                         ),
@@ -793,12 +799,6 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                                   label: t("What went well?", "¿Qué salió bien?"), 
                                   controller: feltGoodCtrl, 
                                   hint: t("e.g. My paddle speed felt better...", "ej. Mi velocidad de remada se sintió mejor...")
-                                ),
-                                const SizedBox(height: 24),
-                                _buildReflectionField(
-                                  label: t("What were you focusing on?", "¿En qué te enfocaste?"), 
-                                  controller: conditionsCtrl, 
-                                  hint: t("e.g. Staying low after takeoff...", "ej. Manteniéndome bajo después del despegue...")
                                 ),
                                 const SizedBox(height: 32),
                               ],
@@ -871,7 +871,7 @@ class SessionLogScreenState extends State<SessionLogScreen> {
     if (mounted) setState(() => _isSheetOpening = false);
 
     if (created != null && !skipSuccessScreen) {
-       _showSessionLoggedModal(created, currentCount: widget.logs.length);
+       _showSessionLoggedModal(created, currentCount: countBefore + 1);
     }
     
     return created;
@@ -890,15 +890,11 @@ class SessionLogScreenState extends State<SessionLogScreen> {
             onGenerateInsight: (s) => widget.onGenerateInsight!(s),
             onFirstFreeAIUsed: widget.onFirstFreeAIInsightUsed,
             onLogAnother: () => Navigator.pop(ctx),
-            onViewSession: () {
-              Navigator.pop(ctx);
-              Future.delayed(const Duration(milliseconds: 300), () {
-                _handlePostSessionFlow(currentCount);
-              });
-            },
+            onViewSession: () => Navigator.pop(ctx),
           ),
         ),
       );
+      _handlePostSessionFlow(currentCount);
     }
   }
 
@@ -908,28 +904,51 @@ class SessionLogScreenState extends State<SessionLogScreen> {
     final bool isPro = widget.isSurferPro;
     final bool seenFirstPrompt = widget.hasSeenFirstInsightPrompt;
     final bool usedFirstFree = widget.hasUsedFirstFreeAIInsight;
+    final bool hasSeenWelcomeGuide = widget.hasSeenWelcomeGuide;
     final int lastShown = widget.lastNudgeShownAt;
 
     // --- LOGGING ---
-    debugPrint('--- [NudgeAudit] Logged Session #$sessionCount ---');
+    debugPrint('--- [NudgeAudit] Post-Session Flow Analysis ---');
+    debugPrint('[NudgeAudit] Session Count: $sessionCount');
     debugPrint('[NudgeAudit] Subscription: isPro=$isPro');
     debugPrint('[NudgeAudit] Milestone Flags: seenFirstPrompt=$seenFirstPrompt, usedFirstFree=$usedFirstFree');
+    debugPrint('[NudgeAudit] Welcome Guide: hasSeenWelcomeGuide=$hasSeenWelcomeGuide');
     debugPrint('[NudgeAudit] Nudge State: lastShownAt=$lastShown');
 
+    // --- 0. FIRST-LOG ONBOARDING PROMPTS ---
+    // Rule: If they haven't seen the welcome guide, show onboarding after session 1.
+    final bool shouldShowOnboarding = !hasSeenWelcomeGuide && 
+                                     sessionCount >= 1 && 
+                                     !widget.hasSeenPostFirstSessionPassportPrompt;
+                                     
+    debugPrint('[NudgeAudit] shouldShowOnboarding: $shouldShowOnboarding (Reason: !seenWelcome=$hasSeenWelcomeGuide, count=$sessionCount, !seenPassportPrompt=${!widget.hasSeenPostFirstSessionPassportPrompt})');
+    
+    if (shouldShowOnboarding) {
+       _triggerPassportPrompt(); 
+       return;
+    }
+
     // --- 1. FIRST FREE INSIGHT PROMPT (Session 4 milestone) ---
-    // Rule: Triggers at session 4 or later if they haven't seen it and haven't used their free insight yet.
+    // Rule: Triggers after session 4 is logged successfully.
     final bool shouldShowFirstInsightPrompt = 
         !isPro && 
         sessionCount >= 4 && 
         !seenFirstPrompt && 
         !usedFirstFree;
+    
+    String promptReason = "";
+    if (isPro) promptReason += "User is Pro. ";
+    if (sessionCount < 4) promptReason += "Count $sessionCount < 4. ";
+    if (seenFirstPrompt) promptReason += "Already seen prompt. ";
+    if (usedFirstFree) promptReason += "Already used free insight. ";
+    if (shouldShowFirstInsightPrompt) promptReason = "Milestone met!";
 
-    debugPrint('[NudgeAudit] shouldShowFirstInsightPrompt: $shouldShowFirstInsightPrompt');
+    debugPrint('[NudgeAudit] shouldShowFirstInsightPrompt: $shouldShowFirstInsightPrompt (Reason: $promptReason)');
 
     if (shouldShowFirstInsightPrompt) {
       debugPrint('[NudgeAudit] TRIGGER: First Free Insight Prompt');
       _triggerFirstInsightPrompt(sessionCount);
-      return; // Return early, don't show a recurring nudge on the same session
+      return;
     }
 
     // --- 2. RECURRING SURFER PRO NUDGE ---
@@ -973,8 +992,8 @@ class SessionLogScreenState extends State<SessionLogScreen> {
         ),
         content: Text(
           t(
-            "We turned your session into a quick insight. Take a look, then decide if you want more.",
-            "Convertimos tu sesión en un insight rápido. Échale un vistazo y decide si quieres más.",
+            "We turned your session into a quick surf insight. Take a look, then decide if you want more.",
+            "Convertimos tu sesión en un insight de surf rápido. Échale un vistazo y decide si quieres más.",
           ),
           style: const TextStyle(color: Color(0xFF475569), height: 1.4),
         ),
@@ -1453,12 +1472,6 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(fontSize: 14, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
                                   ),
-                                  const SizedBox(height: 16),
-                                  MicroTipBanner(
-                                    prefKey: 'seen_history_guidance',
-                                    message: t("Log your first surf and see what your surfing is really telling you.", "Registra tu primer surf y mira lo que tu surf realmente te está diciendo."),
-                                    dismissLabel: t("Got it", "Entendido"),
-                                  ),
                                 ],
                               ),
                             ),
@@ -1549,7 +1562,14 @@ class SessionLogScreenState extends State<SessionLogScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+                  if (widget.logs.isEmpty)
+                    HelperInfoCard(
+                      prefKey: 'seen_history_guidance',
+                      message: t("Log your first surf and see what your surfing is really telling you.", "Registra tu primer surf y mira lo que tu surf realmente te está diciendo."),
+                      dismissLabel: t("Got it", "Entendido"),
+                      margin: const EdgeInsets.only(bottom: 24),
+                    ),
                   // Dynamic Greeting
                   Text(
                     _getDynamicGreeting(widget.displayName),
@@ -1658,17 +1678,17 @@ class SessionLogScreenState extends State<SessionLogScreen> {
     );
 
     try {
+      debugPrint('[AI Generation] Starting generation for session: ${entry.id}');
       final updated = await widget.onGenerateInsight!(entry);
+      debugPrint('[AI Generation] Generation result: ${updated != null ? "SUCCESS" : "FAILED (null returned)"}');
       
       if (mounted) {
+        debugPrint('[AI Generation] Loading stopped: true');
         Navigator.pop(context);
       }
 
       if (updated != null && mounted) {
-        if (widget.onFirstFreeAIInsightUsed != null && !widget.hasUsedFirstFreeAIInsight) {
-           widget.onFirstFreeAIInsightUsed!();
-        }
-        
+        debugPrint('[AI Generation] Daily limit reached detected: false');
         _SessionDetailSheet.show(
           context,
           isSpanish: widget.isSpanish,
@@ -1680,18 +1700,21 @@ class SessionLogScreenState extends State<SessionLogScreen> {
           logs: widget.logs,
           onInsightViewed: widget.onInsightViewed,
           onOpenSurferPro: widget.onOpenSurferPro,
+          onClose: () {
+            // Trigger the "first free used" logic after they've seen the payoff and closed it
+            if (widget.onFirstFreeAIInsightUsed != null && !widget.hasUsedFirstFreeAIInsight) {
+               widget.onFirstFreeAIInsightUsed!();
+            }
+          },
         );
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(t("We couldn't generate your insight yet. Please try again.", "No pudimos generar tu insight aún. Por favor intenta de nuevo.")),
-        ));
+        debugPrint('[AI Generation] Daily limit reached detected: true');
+        debugPrint('[AI Generation] Snackbar shown: true (handled in main.dart)');
       }
     } catch (e) {
+      debugPrint('[AI Generation] CRITICAL ERROR: $e');
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(t("An error occurred. Please check your connection.", "Ocurrió un error. Por favor revisa tu conexión.")),
-        ));
       }
     }
   }

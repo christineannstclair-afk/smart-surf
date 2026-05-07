@@ -6,7 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/subscription_config.dart';
 import '../../ui_system/app_theme.dart';
 import '../../widgets/language_menu.dart';
-import '../../widgets/micro_tip_banner.dart';
+import '../../widgets/helper_info_card.dart';
 import '../coach_pro/subscription_service.dart';
 import 'coach_pro_screen.dart';
 import 'legal_pages.dart';
@@ -408,14 +408,15 @@ widget.onChanged(widget.settings.copyWith(isSpanish: val)),
 ],
 ),
 body: ListView(
-children: [
-          MicroTipBanner(
+        children: [
+          const SizedBox(height: 16),
+          HelperInfoCard(
             prefKey: 'hasSeenSettingsTip',
             visible: !widget.settings.hasSeenSettingsTip,
             onDismiss: () => widget.onChanged(widget.settings.copyWith(hasSeenSettingsTip: true)),
             message: _t(
-              'Manage your experience here—options for QuickStart, signing out, resetting data or the tour, exploring Coach Pro, and legal info.',
-              'Gestiona tu experiencia aquí: opciones para QuickStart, cerrar sesión, restablecer datos o el tour, explorar Coach Pro e información legal.',
+              'Manage your experience here — sign out, reset the tour, restore purchases, and explore Surfer Pro.',
+              'Gestiona tu experiencia aquí: cierra sesión, restablece el tour, restaura compras y explora Surfer Pro.',
             ),
             dismissLabel: _t('Got it', 'Entendido'),
           ),

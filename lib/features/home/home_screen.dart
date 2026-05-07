@@ -31,7 +31,7 @@ import 'profile_summary_card.dart';
 import 'video_preview_modal.dart';
 import '../../widgets/smart_surf_wordmark.dart';
 import '../../ui_system/surf_constants.dart';
-import '../../widgets/micro_tip_banner.dart';
+import '../../widgets/helper_info_card.dart';
 import '../../widgets/orientation_prompt.dart';
 import '../Settings/settings_models.dart';
 
@@ -367,16 +367,7 @@ class HomeScreenState extends State<HomeScreen> {
                       100.0,
                     ),
                     children: [
-                      MicroTipBanner(
-                        prefKey: 'hasSeenDashboardGuide',
-                        visible: widget.sessionsSurfed <= 2 && !widget.seenDashboardPrompt,
-                        onDismiss: widget.onPromptDismissed,
-                        message: _t(
-                          "This is your surf dashboard. Log sessions, track your progress, and build your surf identity.",
-                          "Este es tu dashboard de surf. Registra sesiones, sigue tu progreso y construye tu identidad de surf.",
-                        ),
-                        dismissLabel: _t("Got it", "Entendido"),
-                      ),
+
                       // 1) Header Area (Profile)
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -494,6 +485,19 @@ class HomeScreenState extends State<HomeScreen> {
                       FirebaseService().saveFullProfile(data);
                     },
                   ),
+                ),
+                
+                // Dashboard helper card repositioned here
+                HelperInfoCard(
+                  prefKey: 'hasSeenDashboardGuide',
+                  visible: widget.sessionsSurfed <= 2 && !widget.seenDashboardPrompt,
+                  onDismiss: widget.onPromptDismissed,
+                  message: _t(
+                    "This is your surf dashboard. Log sessions, track your progress, and build your surf identity.",
+                    "Este es tu dashboard de surf. Registra sesiones, sigue tu progreso y construye tu identidad de surf.",
+                  ),
+                  dismissLabel: _t("Got it", "Entendido"),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
                 ),
 
                 if (widget.displayName.isEmpty && widget.stance.isEmpty && widget.height.isEmpty && widget.weight.isEmpty && widget.location.isEmpty && widget.age.isEmpty && widget.surferSummary.isEmpty)
@@ -746,19 +750,14 @@ class HomeScreenState extends State<HomeScreen> {
 
     if (!hasThreeSessions || hasSeenFirstInsight) return const SizedBox.shrink();
 
-    return AppCard(
+    return HelperInfoCard(
+      margin: const EdgeInsets.only(bottom: AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.auto_awesome, color: AppTheme.primary, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                _t("Get your first surf insight", "Tu primer insight de surf"),
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
-              ),
-            ],
+          Text(
+            _t("Get your first surf insight", "Tu primer insight de surf"),
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
           ),
           const SizedBox(height: 12),
           Text(
@@ -766,10 +765,9 @@ class HomeScreenState extends State<HomeScreen> {
               "We turned your session into a quick insight. Take a look, then decide if you want more.",
               "Convertimos tu sesión en un insight rápido. Échale un vistazo y decide si quieres más.",
             ),
-            style: const TextStyle(fontSize: 14, color: AppTheme.textMuted, height: 1.4),
+            style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary, height: 1.4),
           ),
           const SizedBox(height: 20),
-          // Primary CTA — value first
           SizedBox(
             width: double.infinity,
             child: FilledButton(
@@ -787,7 +785,6 @@ class HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          // Secondary CTA — trial, deprioritized visually
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
@@ -801,19 +798,6 @@ class HomeScreenState extends State<HomeScreen> {
               child: Text(
                 _t("Start 3-day free trial", "Comenzar prueba de 3 días"),
                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-              ),
-            ),
-          ),
-          // Tertiary CTA — not now, lowest priority
-          Center(
-            child: TextButton(
-              onPressed: () {},
-              child: Text(
-                _t("Not now", "Ahora no"),
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.textMuted.withOpacity(0.7),
-                ),
               ),
             ),
           ),
@@ -1471,34 +1455,22 @@ class HomeScreenState extends State<HomeScreen> {
     final sessionsAfter = firstInsightIndex; 
     if (sessionsAfter < 3) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-      child: AppCard(
-        onTap: widget.onOpenLogTab,
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            const Icon(Icons.lightbulb_outline, color: AppTheme.secondary, size: 28),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _t("You’ve logged a few sessions...", "Has registrado algunas sesiones..."),
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _t("Want to see what’s changing?", "¿Quieres ver qué está cambiando?"),
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                  ),
-                ],
-              ),
-            ),
-            const Text("🚀", style: TextStyle(fontSize: 20)),
-          ],
-        ),
+    return HelperInfoCard(
+      margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+      onTap: widget.onOpenLogTab,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _t("You’ve logged a few sessions...", "Has registrado algunas sesiones..."),
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _t("Want to see what’s changing?", "¿Quieres ver qué está cambiando?"),
+            style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary),
+          ),
+        ],
       ),
     );
   }

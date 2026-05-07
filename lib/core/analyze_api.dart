@@ -139,24 +139,32 @@ class AnalyzeApi {
       debugPrint("AnalyzeApi: Response status: ${response.statusCode}");
       
       if (response.statusCode == 200) {
-        debugPrint("AnalyzeApi: REAL BACKEND SUCCESS ✔");
+        debugPrint("AnalyzeApi: SUCCESS ✔");
         return jsonDecode(response.body);
-      } else if (response.statusCode == 429) {
-        debugPrint("AnalyzeApi: DAILY LIMIT REACHED ✖ (HTTP 429)");
+      } else if (response.statusCode == 401) {
+        debugPrint("AnalyzeApi: AUTH ERROR ✖ (401)");
         final body = jsonDecode(response.body);
-        if (body['detail'] != null && body['detail']['error'] == 'daily_limit_reached') {
-          throw Exception('DAILY_LIMIT_REACHED');
+        final detail = body['detail'] ?? 'AUTH_EXPIRED';
+        throw Exception('AUTH_ERROR: $detail');
+      } else if (response.statusCode == 403) {
+        debugPrint("AnalyzeApi: PAYWALL REQUIRED ✖ (403)");
+        final body = jsonDecode(response.body);
+        if (body['detail'] != null && body['detail']['error'] == 'paywall_required') {
+          throw Exception('PAYWALL_REQUIRED');
         }
+        throw Exception('PAYWALL_REQUIRED');
+      } else if (response.statusCode == 429) {
+        debugPrint("AnalyzeApi: DAILY LIMIT REACHED ✖ (429)");
         throw Exception('DAILY_LIMIT_REACHED');
       } else {
         debugPrint("AnalyzeApi: BACKEND ERROR ${response.statusCode} ✖");
-        throw Exception('Failed with status: ${response.statusCode}');
+        throw Exception('BACKEND_ERROR_${response.statusCode}');
       }
     } catch (e) {
       debugPrint("AnalyzeApi: REQUEST FAILED: $e");
-      if (e.toString().contains('DAILY_LIMIT_REACHED')) {
-        throw Exception('DAILY_LIMIT_REACHED');
-      }
+      if (e.toString().contains('AUTH_ERROR')) throw Exception(e.toString());
+      if (e.toString().contains('PAYWALL_REQUIRED')) throw Exception('PAYWALL_REQUIRED');
+      if (e.toString().contains('DAILY_LIMIT_REACHED')) throw Exception('DAILY_LIMIT_REACHED');
       throw Exception('Reflection request failed: $e');
     }
   }

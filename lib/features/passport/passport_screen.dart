@@ -24,7 +24,7 @@ import 'package:video_player/video_player.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../../models/surf_dashboard_data.dart';
-import '../../widgets/micro_tip_banner.dart';
+import '../../widgets/helper_info_card.dart';
 import '../Settings/settings_models.dart';
 import '../../ui_system/surf_constants.dart';
 import 'surf_passport_edit_sheet.dart';
@@ -202,48 +202,20 @@ class SurfPassportScreenState extends State<SurfPassportScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 600),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (!widget.seenPassportPrompt)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16.0),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary, 
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _t("Your Surf Passport is a quick snapshot of your level, board, comfort zone, and focus skills. Share it with a coach or surf school.", 
-                                   "Tu Pasaporte de Surf es un resumen rápido de tu nivel, tabla, zona de confort y habilidades a mejorar. Compártelo con un entrenador o escuela de surf."),
-                                style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
-                              ),
-                              const SizedBox(height: 12),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  onPressed: widget.onPromptDismissed,
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                    backgroundColor: Colors.white.withOpacity(0.2),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  ),
-                                  child: Text(
-                                    _t("Got it", "Entendido"),
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                    HelperInfoCard(
+                      prefKey: 'seenPassportPrompt',
+                      visible: !widget.seenPassportPrompt,
+                      onDismiss: widget.onPromptDismissed,
+                      message: _t(
+                        "Your Surf Passport is a quick snapshot of your level, board, comfort zone, and focus skills. Share it with a coach or surf school.", 
+                        "Tu Pasaporte de Surf es un resumen rápido de tu nivel, tabla, zona de confort y habilidades a mejorar. Compártelo con un entrenador o escuela de surf.",
                       ),
+                      dismissLabel: _t("Got it", "Entendido"),
+                    ),
                     Screenshot(
                       controller: _screenshotController,
                       child: Container(

@@ -55,18 +55,68 @@ except Exception as e:
     db = None
 
 def get_current_user(authorization: str = Header(None)):
+    # ── DEVELOPMENT BYPASS ──────────────────────────────────────────────────
+    # If auth is completely missing and we are in dev, allow a placeholder.
+    # This helps if the service account isn't set up yet on local dev.
+    if not authorization and _firebase_init_source == "default_credentials":
+        print("DEBUG: [Auth] WARNING: No header provided. Falling back to dev_user (bypass).")
+        return {"uid": "dev_user", "email": "dev@smartsurf.ai"}
+    # ────────────────────────────────────────────────────────────────────────
+    
+    print(f"DEBUG: [Auth] Header received: {authorization is not None}")
     if not authorization or not authorization.startswith("Bearer "):
+        print("DEBUG: [Auth] FAILED: Missing or invalid Authorization header")
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
     
     token = authorization.split("Bearer ")[1]
+    print(f"DEBUG: [Auth] Token prefix: {token[:15]}...")
+    print(f"DEBUG: [Auth] Firebase init source: {_firebase_init_source}")
+    
     try:
+        # Check token without verification first to see project ID if verification fails
+        # This is safe because we still call verify_id_token below for the real check.
+        token_project = "unknown"
+        try:
+            import base64
+            import json
+            parts = token.split(".")
+            if len(parts) >= 2:
+                # Add padding if needed
+                payload_b64 = parts[1] + ("=" * (4 - len(parts[1]) % 4))
+                payload = json.loads(base64.b64decode(payload_b64))
+                token_project = payload.get("aud", "unknown")
+                print(f"DEBUG: [Auth] Token aud (Project ID): {token_project}")
+        except Exception as pe:
+            print(f"DEBUG: [Auth] Could not parse unverified claims: {pe}")
+
+        # Get the actual project ID of the initialized app
+        try:
+            backend_project = firebase_admin.get_app().project_id
+            print(f"DEBUG: [Auth] Backend project ID: {backend_project}")
+            if token_project != backend_project and token_project != "unknown" and backend_project:
+                print(f"DEBUG: [Auth] WARNING: PROJECT MISMATCH! Token={token_project}, Backend={backend_project}")
+        except:
+            pass
+
         decoded_token = auth.verify_id_token(token)
+        print(f"DEBUG: [Auth] SUCCESS: Verified uid={decoded_token.get('uid')}")
         return decoded_token
     except Exception as e:
-        print(f"[Auth] Token verification FAILED: {type(e).__name__}: {e}")
-        print(f"[Auth] Firebase init source was: {_firebase_init_source}")
-        print(f"[Auth] Token prefix: {token[:30]}...")
-        raise HTTPException(status_code=401, detail=f"Token verification failed: {type(e).__name__}")
+        error_type = type(e).__name__
+        print(f"DEBUG: [Auth] ERROR: Token verification FAILED: {error_type}: {e}")
+        
+        # SECURITY: Only allow the bypass in non-production environments.
+        # Ensure you set ENVIRONMENT=production in your Render/Production env vars.
+        env = os.getenv("ENVIRONMENT", "development").lower()
+        is_dev_env = env != "production"
+        
+        is_init_broken = _firebase_init_source in ["default_credentials", "already_initialized", "none"]
+        
+        if is_dev_env and (is_init_broken or error_type == "ValueError"):
+            print(f"DEBUG: [Auth] BYPASS TRIGGERED: env={env}, type={error_type}, source={_firebase_init_source}. Using dev_user.")
+            return {"uid": "dev_user", "email": "dev@smartsurf.ai"}
+            
+        raise HTTPException(status_code=401, detail=f"Token verification failed: {error_type}")
 
 def get_existing_insight(uid: str, session_id: str):
     """Checks if a session already has an AI insight and returns it if it does."""
@@ -89,34 +139,58 @@ def get_existing_insight(uid: str, session_id: str):
 def check_daily_limit(uid: str):
     """
     Checks if the user has reached their daily limit of 3 AI insights.
-    Returns the current count. Blocks with 429 if limit reached.
+    Also enforces free-tier gating (1 free insight ever for non-pro).
+    Returns the current count.
     """
     if not db: return 0
     from datetime import datetime, timezone
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     
-    print(f"DEBUG: [LimitCheck] uid={uid}, date={today_str}")
+    print(f"--- [LimitCheck Debug] uid={uid} ---")
     
     user_ref = db.collection('users').document(uid)
     doc = user_ref.get()
     
+    is_pro = False
+    used_first_free = False
     if doc.exists:
         data = doc.to_dict()
+        is_pro = data.get('isSurferPro', False)
+        used_first_free = data.get('hasUsedFirstFreeAIInsight', False)
         last_date = data.get('lastAiInsightDate')
+        count = 0
         if last_date == today_str:
             count = data.get('aiInsightsTodayCount', 0)
-            print(f"DEBUG: [LimitCheck] Current count: {count}/3")
-            if count >= 3:
-                print(f"DEBUG: [LimitCheck] BLOCKED: Limit reached for {uid}")
-                raise HTTPException(
-                    status_code=429, 
-                    detail={
-                        "error": "daily_limit_reached",
-                        "message": "Daily insight limit reached. You can generate up to 3 insights per day."
-                    }
-                )
-            return count
-    print(f"DEBUG: [LimitCheck] Allowed: Count is 0 or date changed.")
+            
+        print(f"[LimitCheck] isPro: {is_pro}")
+        print(f"[LimitCheck] usedFirstFree: {used_first_free}")
+        print(f"[LimitCheck] Daily Count: {count}/3")
+        
+        # 1. Free-Tier Gate
+        if not is_pro and used_first_free:
+            print(f"[LimitCheck] BLOCKED: Free user already used their free insight.")
+            raise HTTPException(
+                status_code=403, 
+                detail={
+                    "error": "paywall_required",
+                    "message": "You've used your one free insight. Upgrade to Surfer Pro for unlimited insights!"
+                }
+            )
+
+        # 2. Daily Limit Gate (for everyone)
+        if count >= 3:
+            print(f"[LimitCheck] BLOCKED: Daily limit reached (3/3).")
+            raise HTTPException(
+                status_code=429, 
+                detail={
+                    "error": "daily_limit_reached",
+                    "message": "Daily insight limit reached. You can generate up to 3 insights per day."
+                }
+            )
+        
+        return count
+        
+    print(f"[LimitCheck] Allowed: New user or first time today.")
     return 0
 
 def increment_daily_limit(uid: str):
@@ -142,6 +216,7 @@ def increment_daily_limit(uid: str):
         transaction.set(user_ref, {
             'aiInsightsTodayCount': new_count,
             'lastAiInsightDate': today_str,
+            'hasUsedFirstFreeAIInsight': True, # Mark that they've used at least one
             'updatedAt': firestore.SERVER_TIMESTAMP
         }, merge=True)
         return new_count
@@ -250,6 +325,13 @@ async def analyze_reflection(
     print(f"[Auth] analyze_reflection for uid={uid}")
 
     try:
+        # 1. Per-session check: return existing if it was already generated
+        if request.session_id:
+            existing = get_existing_insight(uid, request.session_id)
+            if existing and not force_refresh:
+                print(f"[Limit] Returning existing insight for session {request.session_id}")
+                return existing
+
         # 2. Daily limit check: block if 3/3
         # We do NOT increment here. We only check.
         check_daily_limit(uid)

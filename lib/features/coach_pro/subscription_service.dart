@@ -74,13 +74,13 @@ class RevenueCatSubscriptionService implements SubscriptionService {
   Future<bool> _isEntitlementActive(String entitlementId) async {
     try {
       final customerInfo = await Purchases.getCustomerInfo();
-      debugPrint('[PurchaseService] Checking entitlement status for: $entitlementId');
-      debugPrint('[PurchaseService] Identifiers in customerInfo:');
+      debugPrint('[EntitlementCheck] Checking entitlement status for: $entitlementId');
+      debugPrint('[EntitlementCheck] Identifiers in customerInfo:');
       debugPrint('   - Entitlements: ${customerInfo.entitlements.all.keys.join(', ')}');
       debugPrint('   - Active Subscriptions: ${customerInfo.activeSubscriptions.join(', ')}');
       
       final active = customerInfo.entitlements.all[entitlementId]?.isActive ?? false;
-      debugPrint('[PurchaseService] Is "$entitlementId" active? $active');
+      debugPrint('[EntitlementCheck] Is "$entitlementId" active? $active');
       return active;
     } catch (e) {
       debugPrint('[PurchaseService] Error fetching entitlement status: $e');
@@ -157,16 +157,16 @@ class RevenueCatSubscriptionService implements SubscriptionService {
       }
 
       debugPrint('[PurchaseService] Package identified: ${package.identifier} for product: ${package.storeProduct.identifier}');
-      debugPrint('[PurchaseService] Calling Purchases.purchasePackage(package)...');
+      debugPrint('[PurchaseState] Calling Purchases.purchasePackage(package)...');
       
       final result = await Purchases.purchasePackage(package);
       final active = result.customerInfo.entitlements.all[SubscriptionConfig.entitlementSurferPro]?.isActive ?? false;
       
-      debugPrint('[PurchaseService] Purchase transaction complete.');
-      debugPrint('[PurchaseService] Post-purchase status:');
+      debugPrint('[PurchaseState] Purchase transaction complete.');
+      debugPrint('[EntitlementCheck] Post-purchase status:');
       debugPrint('   - Entitlements active: ${result.customerInfo.entitlements.active.keys.join(', ')}');
       debugPrint('   - Subscriptions active: ${result.customerInfo.activeSubscriptions.join(', ')}');
-      debugPrint('[PurchaseService] Entitlement "${SubscriptionConfig.entitlementSurferPro}" active: $active');
+      debugPrint('[EntitlementCheck] Entitlement "${SubscriptionConfig.entitlementSurferPro}" active: $active');
       
       return active;
     } on PlatformException catch (e) {

@@ -6,19 +6,21 @@ import '../../core/subscription_config.dart';
 import '../session_log/firebase_service.dart';
 import '../coach_pro/subscription_service.dart';
 
-void openSurferProPaywall(BuildContext context, {required String source, bool isSpanish = false}) {
+Future<bool?> openSurferProPaywall(BuildContext context, {required String source, bool isSpanish = false}) {
   debugPrint('[Paywall] Opening paywall from source: $source');
   FirebaseService().logEvent(
     'paywall_cta_tap',
     parameters: {'source': source},
   );
   
-  showUpgradeBottomSheet(
+  return showUpgradeBottomSheet<bool>(
     context: context,
     isSpanish: isSpanish,
     child: SurfInsightPaywall(isSpanish: isSpanish),
-  ).then((_) {
-    FirebaseService().logEvent('paywall_opened', parameters: {'success': true});
+  ).then((result) {
+    final success = result ?? false;
+    FirebaseService().logEvent('paywall_opened', parameters: {'success': success ? 1 : 0});
+    return result;
   });
 }
 
@@ -158,7 +160,8 @@ class _SurfInsightPaywallState extends State<SurfInsightPaywall> {
                   if (mounted) {
                      setState(() => _isLoading = false);
                      if (success) {
-                       Navigator.pop(context);
+                       debugPrint('[PurchaseState] Purchase succeeded! Popping paywall with success=true.');
+                       Navigator.pop(context, true);
                      } else {
                        debugPrint('[SurfInsightPaywall] User cancelled or no package found.');
                      }
