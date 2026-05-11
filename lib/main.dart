@@ -508,12 +508,12 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       );
 
       final updatedSession = lastSession.copyWith(
-        aiSummaryEn: result['session_insight_en'],
-        aiSummaryEs: result['session_insight_es'],
-        aiProgressPatternEn: result['progress_pattern_en'],
-        aiProgressPatternEs: result['progress_pattern_es'],
-        aiNextFocusEn: result['next_session_focus_en'],
-        aiNextFocusEs: result['next_session_focus_es'],
+        aiSummaryEn: result['aiSummaryEn'],
+        aiSummaryEs: result['aiSummaryEs'],
+        aiProgressPatternEn: result['aiProgressPatternEn'],
+        aiProgressPatternEs: result['aiProgressPatternEs'],
+        aiNextFocusEn: result['aiNextFocusEn'],
+        aiNextFocusEs: result['aiNextFocusEs'],
       );
       
       _addSession(updatedSession);
@@ -538,7 +538,10 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
   Future<SessionLogEntry?> _generateInsight(SessionLogEntry session) async {
     final String userId = FirebaseAuth.instance.currentUser?.uid ?? "unknown";
     final String utcDayKey = DateTime.now().toUtc().toIso8601String().split('T')[0];
-    final bool hasExisting = (session.aiSummaryEn?.isNotEmpty == true) || (session.aiSummary?.isNotEmpty == true);
+    final bool hasExisting = (session.aiSummaryEn?.isNotEmpty == true) || 
+                            (session.aiSummaryEs?.isNotEmpty == true) ||
+                            (session.aiProgressPatternEn?.isNotEmpty == true) ||
+                            (session.aiNextFocusEn?.isNotEmpty == true);
     
     debugPrint("--- [PaywallGate] ---");
     debugPrint("[PaywallGate] Session ID: ${session.id}");
@@ -655,6 +658,10 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
     }
 
     final bool willGenerate = !hasExisting;
+    if (hasExisting) {
+      debugPrint("[AI Gen] SHORT-CIRCUIT: Returning existing insight without calling backend.");
+      return session;
+    }
     debugPrint("--- [DailyLimitAudit] ---");
     debugPrint("[Limit] User ID: $userId");
     debugPrint("[Limit] UTC Day: $utcDayKey");
@@ -698,12 +705,22 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
       debugPrint("[AI Gen] SUCCESS: Backend responded.");
       debugPrint("[AI Gen] Payload: $result");
 
+      // VALIDATION: Confirm required fields (using new standardized keys)
+      final String? summary = result['aiSummaryEn'];
+      final String? pattern = result['aiProgressPatternEn'];
+      final String? focus = result['aiNextFocusEn'];
+
+      if (summary == null || summary.isEmpty || pattern == null || pattern.isEmpty || focus == null || focus.isEmpty) {
+        debugPrint("[AI Gen] FAILED: Backend returned empty/null required fields.");
+        throw Exception('EMPTY_INSIGHT_FIELDS');
+      }
+
       final updatedSession = session.copyWith(
-        aiSummaryEn: result['session_insight_en'],
+        aiSummaryEn: summary,
         aiSummaryEs: result['session_insight_es'],
-        aiProgressPatternEn: result['progress_pattern_en'],
+        aiProgressPatternEn: pattern,
         aiProgressPatternEs: result['progress_pattern_es'],
-        aiNextFocusEn: result['next_session_focus_en'],
+        aiNextFocusEn: focus,
         aiNextFocusEs: result['next_session_focus_es'],
         aiFocusTagEn: result['focus_tag_en'],
         aiFocusTagEs: result['focus_tag_es'],
@@ -729,8 +746,10 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
         String errorMsg = _isSpanish ? "Ocurrió un error. Revisa tu conexión." : "An error occurred. Please check your connection.";
         
         if (e.toString().contains('AUTH_ERROR')) {
+          debugPrint("[AI Error Type] AUTH_FAILURE");
           errorMsg = _isSpanish ? "Sesión expirada o inválida. Revisa tu cuenta." : "Authentication failed. ${e.toString().split('AUTH_ERROR: ').last}";
         } else if (e.toString().contains('DAILY_LIMIT_REACHED')) {
+          debugPrint("[AI Error Type] DAILY_LIMIT");
           debugPrint("[Limit] dailyLimitReachedDetected: true (from backend)");
           errorMsg = _isSpanish 
             ? "Límite de insights alcanzado. Puedes generar hasta 3 insights por día." 
@@ -738,11 +757,22 @@ class _SmartSurfAppState extends State<SmartSurfApp> {
           debugPrint("[Limit] snackbarShown: true");
           debugPrint("[Limit] loadingStopped: true (via return null in catch)");
         } else if (e.toString().contains('PAYWALL_REQUIRED')) {
+          debugPrint("[AI Error Type] PAYWALL_REQUIRED");
           debugPrint("[AI Gen] Paywall required. Showing modal.");
           openSurferProPaywall(context, source: 'backend_gate', isSpanish: _isSpanish);
           return null; // Return early, don't show snackbar for paywall
+        } else if (e.toString().contains('EMPTY_INSIGHT_FIELDS')) {
+          debugPrint("[AI Error Type] EMPTY_FIELDS");
+          errorMsg = _isSpanish ? "Insight no disponible en este momento. Inténtalo de nuevo." : "Insight unavailable right now. Please try again.";
+        } else if (e.toString().contains('AI_PARSE_FAILED')) {
+          debugPrint("[AI Error Type] PARSE_FAILURE");
+          errorMsg = _isSpanish ? "Insight no disponible en este momento. Inténtalo de nuevo." : "Insight unavailable right now. Please try again.";
         } else if (e.toString().contains('BACKEND_ERROR')) {
+          debugPrint("[AI Error Type] BACKEND_FAILURE");
           errorMsg = _isSpanish ? "Insight no disponible en este momento." : "Insight unavailable right now.";
+        } else {
+          debugPrint("[AI Error Type] UNKNOWN / NETWORK");
+          errorMsg = _isSpanish ? "Ocurrió un error. Revisa tu conexión." : "Insight unavailable right now. Please check your connection.";
         }
 
         _messengerKey.currentState?.showSnackBar(

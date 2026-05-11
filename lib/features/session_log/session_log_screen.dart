@@ -1648,6 +1648,29 @@ class SessionLogScreenState extends State<SessionLogScreen> {
   Future<void> _handleGenerateInsight(SessionLogEntry entry) async {
     if (widget.onGenerateInsight == null) return;
 
+    // Check if we already have a valid insight to avoid duplicate generation
+    final bool hasExisting = (entry.aiSummaryEn?.isNotEmpty == true) || 
+                            (entry.aiSummaryEs?.isNotEmpty == true) ||
+                            (entry.aiProgressPatternEn?.isNotEmpty == true) ||
+                            (entry.aiNextFocusEn?.isNotEmpty == true);
+
+    if (hasExisting) {
+      debugPrint("[AI Generation] Insight already exists for session ${entry.id}. Showing cached insight.");
+      _SessionDetailSheet.show(
+        context,
+        isSpanish: widget.isSpanish,
+        session: entry,
+        isSurferPro: widget.isSurferPro,
+        hasUsedFirstFreeAIInsight: widget.hasUsedFirstFreeAIInsight,
+        units: widget.units,
+        onAdd: widget.onAdd,
+        logs: widget.logs,
+        onInsightViewed: widget.onInsightViewed,
+        onOpenSurferPro: widget.onOpenSurferPro,
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1707,9 +1730,6 @@ class SessionLogScreenState extends State<SessionLogScreen> {
             }
           },
         );
-      } else if (mounted) {
-        debugPrint('[AI Generation] Daily limit reached detected: true');
-        debugPrint('[AI Generation] Snackbar shown: true (handled in main.dart)');
       }
     } catch (e) {
       debugPrint('[AI Generation] CRITICAL ERROR: $e');

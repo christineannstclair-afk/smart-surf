@@ -62,8 +62,8 @@ Example: "Next session, pay attention to when the board first starts to glide an
 
 OUTPUT FORMAT:
 Return a valid JSON object with exactly these keys:
-- "session_insight_en", "progress_pattern_en", "next_session_focus_en", "focus_tag_en"
-- "session_insight_es", "progress_pattern_es", "next_session_focus_es", "focus_tag_es"
+- "aiSummaryEn", "aiProgressPatternEn", "aiNextFocusEn", "aiFocusTagEn"
+- "aiSummaryEs", "aiProgressPatternEs", "aiNextFocusEs", "aiFocusTagEs"
 """
 
 SYSTEM_PROMPT = """
@@ -124,8 +124,8 @@ Example: "Next session, try noticing the first moment the board starts to glide.
 
 OUTPUT FORMAT:
 Return a valid JSON object with exactly these keys:
-- "session_insight_en", "progress_pattern_en", "next_session_focus_en", "focus_tag_en"
-- "session_insight_es", "progress_pattern_es", "next_session_focus_es", "focus_tag_es"
+- "aiSummaryEn", "aiProgressPatternEn", "aiNextFocusEn", "aiFocusTagEn"
+- "aiSummaryEs", "aiProgressPatternEs", "aiNextFocusEs", "aiFocusTagEs"
 """
 
 def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: str, conditions: str, notes: str, language: str = "en", history: list = None, wave_height: str = "", board: str = "") -> dict:
@@ -228,44 +228,113 @@ Write the response now. Follow all tone and structure rules.
     )
 
     FALLBACK = {
-        "session_insight_en": "Reflecting on your takeoff moment is a great way to build awareness.",
-        "progress_pattern_en": "Timing often feels different from session to session as you learn the wave's rhythm.",
-        "next_session_focus_en": "Next session, try noticing the moment the board starts its forward glide.",
-        "focus_tag_en": "awareness",
-        "session_insight_es": "Reflexionar sobre el momento del despegue es una excelente manera de desarrollar la conciencia.",
-        "progress_pattern_es": "La sincronización a menudo se siente diferente de una sesión a otra a medida que aprendes el ritmo de la ola.",
-        "next_session_focus_es": "En la próxima sesión, intenta notar el momento en que la tabla comienza su deslizamiento hacia adelante.",
-        "focus_tag_es": "conciencia",
+        "aiSummaryEn": "Reflecting on your takeoff moment is a great way to build awareness.",
+        "aiProgressPatternEn": "Timing often feels different from session to session as you learn the wave's rhythm.",
+        "aiNextFocusEn": "Next session, try noticing the moment the board starts its forward glide.",
+        "aiFocusTagEn": "awareness",
+        "aiSummaryEs": "Reflexionar sobre el momento del despegue es una excelente manera de desarrollar la conciencia.",
+        "aiProgressPatternEs": "La sincronización a menudo se siente diferente de una sesión a otra a medida que aprendes el ritmo de la ola.",
+        "aiNextFocusEs": "En la próxima sesión, intenta notar el momento en que la tabla comienza su deslizamiento hacia adelante.",
+        "aiFocusTagEs": "conciencia",
     }
 
-    raw_content = ""
-    try:
-        raw_content = response.choices[0].message.content
-        print(f"\nRAW LLM RESPONSE:\n{raw_content}\n")
+    required_keys = [
+        "aiSummaryEn", "aiProgressPatternEn", "aiNextFocusEn", "aiFocusTagEn",
+        "aiSummaryEs", "aiProgressPatternEs", "aiNextFocusEs", "aiFocusTagEs"
+    ]
 
-        # Layer 1: direct parse (happy path — model returned clean JSON)
+    def _parse_it(content):
+        if not content: return None
+        parsed = None
+        # Layer 1: direct parse
         try:
-            parsed = json.loads(raw_content)
-            print(f"[DataAudit] PARSED_RESPONSE (layer 1): {json.dumps(parsed, indent=2)}")
-            return parsed
+            parsed = json.loads(content)
         except json.JSONDecodeError:
-            pass
+            # Layer 2: extract first {...} block
+            import re
+            match = re.search(r'\{.*\}', content, re.DOTALL)
+            if match:
+                try:
+                    parsed = json.loads(match.group(0))
+                except json.JSONDecodeError:
+                    pass
+        
+        if not parsed: return None
 
-        # Layer 2: extract first {...} block (handles extra prose around JSON)
-        import re
-        match = re.search(r'\{.*\}', raw_content, re.DOTALL)
-        if match:
-            try:
-                parsed = json.loads(match.group(0))
-                print(f"[DataAudit] PARSED_RESPONSE (layer 2): {json.dumps(parsed, indent=2)}")
-                return parsed
-            except json.JSONDecodeError:
-                pass
+        # MAPPING LAYER: If model used old keys, move them to new keys
+        mapping = {
+            'session_insight_en': 'aiSummaryEn',
+            'progress_pattern_en': 'aiProgressPatternEn',
+            'next_session_focus_en': 'aiNextFocusEn',
+            'focus_tag_en': 'aiFocusTagEn',
+            'session_insight_es': 'aiSummaryEs',
+            'progress_pattern_es': 'aiProgressPatternEs',
+            'next_session_focus_es': 'aiNextFocusEs',
+            'focus_tag_es': 'aiFocusTagEs',
+        }
+        for old, new in mapping.items():
+            if not parsed.get(new) and parsed.get(old):
+                parsed[new] = parsed.get(old)
+        
+        return parsed
 
-        # Layer 3: fallback
-        print(f"PARSE FAILED — returning fallback. Raw output was:\n{raw_content}")
-        return FALLBACK
+    def _validate(parsed):
+        if not parsed: return False
+        missing_or_empty = [k for k in required_keys if not str(parsed.get(k) or "").strip()]
+        return len(missing_or_empty) == 0
 
+    # ATTEMPT 1
+    print("\n[AI_CUSTOM_ATTEMPT_STARTED] Mode:", prompt_mode)
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": active_prompt.strip()},
+                {"role": "user", "content": user_content}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.4,
+            max_tokens=1000
+        )
+        raw_1 = response.choices[0].message.content
+        print("[AI_CUSTOM_RESPONSE_RECEIVED]")
+        
+        parsed_1 = _parse_it(raw_1)
+        if _validate(parsed_1):
+            print("[AI_PARSE_SUCCESS]")
+            return parsed_1
+        
+        # ATTEMPT 2: RETRY with repair prompt
+        print(f"[AI_PARSE_FAILED_RETRYING] Content was: {raw_1[:100]}...")
+        repair_prompt = f"""
+        Your previous response was missing required fields or was malformed.
+        Return a valid JSON object with EXACTLY these keys and non-empty values:
+        {json.dumps(required_keys)}
+        
+        RAW INPUT: {raw_1}
+        """
+        
+        response_2 = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a JSON repair tool. Return valid JSON only."},
+                {"role": "user", "content": repair_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=1000
+        )
+        raw_2 = response_2.choices[0].message.content
+        parsed_2 = _parse_it(raw_2)
+        
+        if _validate(parsed_2):
+            print("[AI_CUSTOM_RETRY_SUCCESS]")
+            return parsed_2
+            
     except Exception as e:
-        print(f"PARSE FAILED — unexpected error: {e}. Raw content: {raw_content!r}")
-        return FALLBACK
+        print(f"[LLM] Connection or API error: {e}")
+
+    # If we reached here, both custom and retry attempts failed.
+    # The user now explicitly wants an error instead of a fallback.
+    print("[AI_GENERATION_FAILED_NO_FALLBACK]")
+    raise ValueError("AI_PARSE_FAILED")

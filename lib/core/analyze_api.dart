@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -5,11 +6,20 @@ import 'package:flutter/foundation.dart';
 
 class AnalyzeApi {
   // Uses live API in production (TestFlight/App Store)
-  static const String _baseUrl = 'https://smart-surf-backend.onrender.com';
   
   // ZERO-SPEND TEST MODE: Flip to TRUE to test UI limits without spending AI tokens.
   // Flip to FALSE for production.
   static const bool isTestMode = false;
+
+  // LOCAL TEST MODE: Set to true to hit your local machine (e.g. 127.0.0.1:8000)
+  // Auto-disabled in release builds (like TestFlight) to force live backend.
+  static const bool _forceLocalInDebug = false; 
+  static bool get useLocalBackend => kReleaseMode ? false : _forceLocalInDebug;
+
+  static const String _liveUrl = 'https://smart-surf-backend.onrender.com';
+  static const String _localUrl = 'http://192.168.0.170:8000'; 
+  
+  static String get _baseUrl => useLocalBackend ? _localUrl : _liveUrl;
 
   static Future<Map<String, dynamic>> uploadAndAnalyze(
     XFile videoFile, {
@@ -116,6 +126,10 @@ class AnalyzeApi {
     
     try {
       debugPrint("AnalyzeApi: CALLING REAL AI BACKEND for reflection...");
+      debugPrint("AnalyzeApi: Request URL: $uri");
+      debugPrint("AnalyzeApi: Auth Token present: ${idToken.isNotEmpty}");
+      debugPrint("AnalyzeApi: Is Release Mode: $kReleaseMode");
+      
       final response = await http.post(
         uri,
         headers: {
@@ -134,13 +148,18 @@ class AnalyzeApi {
           'wave_height': waveHeight,
           'board': board,
         }),
-      ).timeout(const Duration(seconds: 30)); 
+      ).timeout(const Duration(seconds: 90)); 
 
       debugPrint("AnalyzeApi: Response status: ${response.statusCode}");
       
       if (response.statusCode == 200) {
         debugPrint("AnalyzeApi: SUCCESS ✔");
-        return jsonDecode(response.body);
+        try {
+          return jsonDecode(response.body);
+        } catch (e) {
+          debugPrint("AnalyzeApi: PARSE_FAILURE ✖ (Could not parse JSON body: $e)");
+          throw Exception('AI_PARSE_FAILED: $e');
+        }
       } else if (response.statusCode == 401) {
         debugPrint("AnalyzeApi: AUTH ERROR ✖ (401)");
         final body = jsonDecode(response.body);
@@ -156,15 +175,27 @@ class AnalyzeApi {
       } else if (response.statusCode == 429) {
         debugPrint("AnalyzeApi: DAILY LIMIT REACHED ✖ (429)");
         throw Exception('DAILY_LIMIT_REACHED');
+      } else if (response.statusCode == 422) {
+        debugPrint("AnalyzeApi: EMPTY INSIGHT FIELDS ✖ (422) - Body: ${response.body}");
+        throw Exception('EMPTY_INSIGHT_FIELDS');
       } else {
-        debugPrint("AnalyzeApi: BACKEND ERROR ${response.statusCode} ✖");
+        debugPrint("AnalyzeApi: BACKEND ERROR ${response.statusCode} ✖ - Body: ${response.body}");
         throw Exception('BACKEND_ERROR_${response.statusCode}');
       }
+    } on TimeoutException catch (_) {
+      debugPrint("AnalyzeApi: TIMEOUT_FAILURE ✖ (Request took too long)");
+      throw Exception('TIMEOUT_FAILURE');
     } catch (e) {
       debugPrint("AnalyzeApi: REQUEST FAILED: $e");
+      if (e.toString().contains('TimeoutException')) {
+        debugPrint("AnalyzeApi: TIMEOUT_FAILURE ✖");
+        throw Exception('TIMEOUT_FAILURE');
+      }
       if (e.toString().contains('AUTH_ERROR')) throw Exception(e.toString());
       if (e.toString().contains('PAYWALL_REQUIRED')) throw Exception('PAYWALL_REQUIRED');
       if (e.toString().contains('DAILY_LIMIT_REACHED')) throw Exception('DAILY_LIMIT_REACHED');
+      if (e.toString().contains('EMPTY_INSIGHT_FIELDS')) throw Exception('EMPTY_INSIGHT_FIELDS');
+      if (e.toString().contains('AI_PARSE_FAILED')) throw Exception(e.toString());
       throw Exception('Reflection request failed: $e');
     }
   }

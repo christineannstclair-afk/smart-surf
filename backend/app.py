@@ -56,48 +56,19 @@ except Exception as e:
 
 def get_current_user(authorization: str = Header(None)):
     # ── DEVELOPMENT BYPASS ──────────────────────────────────────────────────
-    # If auth is completely missing and we are in dev, allow a placeholder.
-    # This helps if the service account isn't set up yet on local dev.
-    if not authorization and _firebase_init_source == "default_credentials":
-        print("DEBUG: [Auth] WARNING: No header provided. Falling back to dev_user (bypass).")
+    # If we are in local dev (no service account), bypass token verification.
+    if _firebase_init_source == "default_credentials":
+        print("DEBUG: [Auth] LOCAL DEV BYPASS: Returning mock dev_user.")
         return {"uid": "dev_user", "email": "dev@smartsurf.ai"}
     # ────────────────────────────────────────────────────────────────────────
     
-    print(f"DEBUG: [Auth] Header received: {authorization is not None}")
     if not authorization or not authorization.startswith("Bearer "):
         print("DEBUG: [Auth] FAILED: Missing or invalid Authorization header")
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
     
     token = authorization.split("Bearer ")[1]
-    print(f"DEBUG: [Auth] Token prefix: {token[:15]}...")
-    print(f"DEBUG: [Auth] Firebase init source: {_firebase_init_source}")
     
     try:
-        # Check token without verification first to see project ID if verification fails
-        # This is safe because we still call verify_id_token below for the real check.
-        token_project = "unknown"
-        try:
-            import base64
-            import json
-            parts = token.split(".")
-            if len(parts) >= 2:
-                # Add padding if needed
-                payload_b64 = parts[1] + ("=" * (4 - len(parts[1]) % 4))
-                payload = json.loads(base64.b64decode(payload_b64))
-                token_project = payload.get("aud", "unknown")
-                print(f"DEBUG: [Auth] Token aud (Project ID): {token_project}")
-        except Exception as pe:
-            print(f"DEBUG: [Auth] Could not parse unverified claims: {pe}")
-
-        # Get the actual project ID of the initialized app
-        try:
-            backend_project = firebase_admin.get_app().project_id
-            print(f"DEBUG: [Auth] Backend project ID: {backend_project}")
-            if token_project != backend_project and token_project != "unknown" and backend_project:
-                print(f"DEBUG: [Auth] WARNING: PROJECT MISMATCH! Token={token_project}, Backend={backend_project}")
-        except:
-            pass
-
         decoded_token = auth.verify_id_token(token)
         print(f"DEBUG: [Auth] SUCCESS: Verified uid={decoded_token.get('uid')}")
         return decoded_token
@@ -119,8 +90,9 @@ def get_current_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail=f"Token verification failed: {error_type}")
 
 def get_existing_insight(uid: str, session_id: str):
-    """Checks if a session already has an AI insight and returns it if it does."""
+    """Checks if a session already has a COMPLETE AI insight and returns it if it does."""
     if not db or not session_id:
+        print("DEBUG: [Firestore] Skip existing check (no DB client)")
         return None
     
     try:
@@ -128,10 +100,29 @@ def get_existing_insight(uid: str, session_id: str):
         doc = session_ref.get()
         if doc.exists:
             data = doc.to_dict()
-            # If any insight fields exist, we consider it "already analyzed"
-            if any(key in data for key in ['session_insight_en', 'aiSummaryEn', 'session_insight']):
-                print(f"DEBUG: Found existing insight for session {session_id}")
-                return data
+            # We ONLY return existing if the primary insight fields are populated and non-empty.
+            # This prevents returning a "stuck" session with null AI fields.
+            required = ['aiSummaryEn', 'aiProgressPatternEn', 'aiNextFocusEn']
+            is_complete = all(str(data.get(k) or "").strip() not in ["", "null", "None"] for k in required)
+            
+            if is_complete:
+                print(f"BACKEND_AI_FIX_VERSION: ai_fields_guard_v3 (Existing Complete)")
+                print(f"DEBUG: [Limit] Found VALID COMPLETE insight for session {session_id}")
+                res = data.copy()
+                res['BACKEND_AI_FIX_VERSION'] = 'ai_fields_guard_v3'
+                return res
+            else:
+                # Check legacy keys too
+                legacy = ['session_insight_en', 'progress_pattern_en', 'next_session_focus_en']
+                is_legacy_complete = all(str(data.get(k) or "").strip() not in ["", "null", "None"] for k in legacy)
+                if is_legacy_complete:
+                    print(f"BACKEND_AI_FIX_VERSION: ai_fields_guard_v3 (Existing Legacy)")
+                    print(f"DEBUG: [Limit] Found VALID LEGACY insight for session {session_id}")
+                    res = data.copy()
+                    res['BACKEND_AI_FIX_VERSION'] = 'ai_fields_guard_v3'
+                    return res
+                
+                print(f"DEBUG: [Limit] Session {session_id} exists but insight is INCOMPLETE or NULL. Forcing fresh generation.")
     except Exception as e:
         print(f"Error checking existing insight: {e}")
     return None
@@ -330,10 +321,13 @@ async def analyze_reflection(
             existing = get_existing_insight(uid, request.session_id)
             if existing and not force_refresh:
                 print(f"[Limit] Returning existing insight for session {request.session_id}")
+                print(f"FINAL aiSummaryEn = {existing.get('aiSummaryEn')}")
+                print(f"FINAL aiProgressPatternEn = {existing.get('aiProgressPatternEn')}")
+                print(f"FINAL aiNextFocusEn = {existing.get('aiNextFocusEn')}")
+                print(f"FINAL aiFocusTagEn = {existing.get('aiFocusTagEn')}")
                 return existing
 
         # 2. Daily limit check: block if 3/3
-        # We do NOT increment here. We only check.
         check_daily_limit(uid)
 
         # 3. Fetch recent session history
@@ -351,7 +345,7 @@ async def analyze_reflection(
 
         # 4. Call the LLM
         print(f"[LLM] Calling generate_reflection — focus={request.focus!r}, felt_hard={request.felt_hard!r}")
-        result = llm_service.generate_reflection(
+        llm_result = llm_service.generate_reflection(
             focus=request.focus,
             worked_on=request.worked_on,
             felt_hard=request.felt_hard,
@@ -364,20 +358,67 @@ async def analyze_reflection(
             board=request.board
         )
         
-        print(f"[DataAudit] FINAL_OUTPUT_SENT_TO_UI (FRESH): {json.dumps(result, indent=2)}")
+        # 5. COMPATIBILITY MAPPING & AUDIT
+        final_payload = {
+            'BACKEND_AI_FIX_VERSION': 'ai_fields_guard_v3',
+            # New Keys (Requested)
+            'aiSummaryEn': llm_result.get('aiSummaryEn'),
+            'aiProgressPatternEn': llm_result.get('aiProgressPatternEn'),
+            'aiNextFocusEn': llm_result.get('aiNextFocusEn'),
+            'aiFocusTagEn': llm_result.get('aiFocusTagEn'),
+            'aiSummaryEs': llm_result.get('aiSummaryEs'),
+            'aiProgressPatternEs': llm_result.get('aiProgressPatternEs'),
+            'aiNextFocusEs': llm_result.get('aiNextFocusEs'),
+            'aiFocusTagEs': llm_result.get('aiFocusTagEs'),
+            
+            # Old Keys (Frontend Compatibility)
+            'session_insight_en': llm_result.get('aiSummaryEn'),
+            'progress_pattern_en': llm_result.get('aiProgressPatternEn'),
+            'next_session_focus_en': llm_result.get('aiNextFocusEn'),
+            'focus_tag_en': llm_result.get('aiFocusTagEn'),
+            'session_insight_es': llm_result.get('aiSummaryEs'),
+            'progress_pattern_es': llm_result.get('aiProgressPatternEs'),
+            'next_session_focus_es': llm_result.get('aiNextFocusEs'),
+            'focus_tag_es': llm_result.get('aiFocusTagEs'),
+        }
 
-        # 5. Record in Firestore session document
-        record_insight_in_session(uid, request.session_id, result)
+        print(f"BACKEND_AI_FIX_VERSION: ai_fields_guard_v3")
+
+        print(f"FINAL aiSummaryEn = {final_payload.get('aiSummaryEn')}")
+        print(f"FINAL aiProgressPatternEn = {final_payload.get('aiProgressPatternEn')}")
+        print(f"FINAL aiNextFocusEn = {final_payload.get('aiNextFocusEn')}")
+        print(f"FINAL aiFocusTagEn = {final_payload.get('aiFocusTagEn')}")
+
+        # SAFETY CHECK: If for any reason the keys are still null here, DO NOT return 200.
+        required_out = ['aiSummaryEn', 'aiProgressPatternEn', 'aiNextFocusEn']
+        is_output_valid = all(str(final_payload.get(k) or "").strip() not in ["", "null", "None"] for k in required_out)
+        
+        if not is_output_valid:
+            print("LOG: AI_FIELDS_MISSING (Safety Check Triggered) — Fields were null/empty at final stage.")
+            # DO NOT save to firestore, DO NOT increment limit
+            raise HTTPException(status_code=422, detail="EMPTY_INSIGHT_FIELDS")
+
+        # 6. Record in Firestore session document
+        record_insight_in_session(uid, request.session_id, final_payload)
         print("[LLM] Insight recorded in Firestore.")
 
-        # 6. Increment limit count ONLY after successful save
+        # 7. Increment limit count ONLY after successful save
         increment_daily_limit(uid)
         
-        return result
+        return final_payload
+
     except HTTPException:
         raise
     except ValueError as ve:
-        raise HTTPException(status_code=500, detail=str(ve))
+        error_str = str(ve)
+        print(f"[LLM] BACKEND_ERROR: {error_str}")
+        # Identify specific failure types for logging
+        if "AI_PARSE_FAILED" in error_str:
+            print("LOG: AI_PARSE_FAILED")
+        elif "AI_FIELDS_MISSING" in error_str:
+            print("LOG: AI_FIELDS_MISSING")
+            
+        raise HTTPException(status_code=422, detail=error_str)
     except Exception as e:
         print(f"Error calling LLM Service: {e}")
         traceback.print_exc()
@@ -397,8 +438,10 @@ async def analyze_popup(
         if session_id:
             existing = get_existing_insight(uid, session_id)
             if existing:
+                print(f"BACKEND_AI_FIX_VERSION: ai_fields_guard_v3 (Popup Existing)")
                 # Need to map back to popup structure if returning existing session
                 return {
+                    "BACKEND_AI_FIX_VERSION": "ai_fields_guard_v3",
                     "confidence_score": existing.get('aiConfidence', 0),
                     "metrics": {"popup_time_seconds": existing.get('aiPopupTime', 0)},
                     "feedback": {"primary_improvement": existing.get('aiSummaryEn', '')},
@@ -466,6 +509,14 @@ async def analyze_popup(
         increment_daily_limit(uid)
 
         # 7. Return results
+        result['BACKEND_AI_FIX_VERSION'] = 'ai_fields_guard_v3'
+        print(f"BACKEND_AI_FIX_VERSION: ai_fields_guard_v3 (Popup Fresh)")
+        
+        # SAFETY CHECK
+        if not result.get('feedback', {}).get('primary_improvement'):
+            print("LOG: AI_FIELDS_MISSING (Popup Safety Check Triggered)")
+            raise HTTPException(status_code=422, detail="EMPTY_INSIGHT_FIELDS")
+
         return result
         
     except HTTPException:

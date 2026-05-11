@@ -415,8 +415,8 @@ body: ListView(
             visible: !widget.settings.hasSeenSettingsTip,
             onDismiss: () => widget.onChanged(widget.settings.copyWith(hasSeenSettingsTip: true)),
             message: _t(
-              'Manage your experience here — sign out, reset the tour, restore purchases, and explore Surfer Pro.',
-              'Gestiona tu experiencia aquí: cierra sesión, restablece el tour, restaura compras y explora Surfer Pro.',
+              'Manage your experience here — sign out, run the tour, restore purchases, and explore Surfer Pro.',
+              'Gestiona tu experiencia aquí: cierra sesión, ver el tour, restaura compras y explora Surfer Pro.',
             ),
             dismissLabel: _t('Got it', 'Entendido'),
           ),
@@ -526,23 +526,7 @@ onTap: () => _showExportData(context),
   onTap: () => _confirmSignOut(context),
  ),
 
-ListTile(
-leading: const Icon(Icons.tour_outlined, color: Colors.teal),
-title: Text(
-_t('Reset Onboarding Tour', 'Reiniciar Tour de Bienvenida'),
-style: const TextStyle(
-color: Colors.teal,
-fontWeight: FontWeight.w600,
-),
-),
-subtitle: Text(
-_t(
-'Show the guided tour again on next launch.',
-'Mostrar el tour guiado en el próximo inicio.',
-),
-),
-      onTap: widget.onResetOnboarding,
-),
+
 ListTile(
 leading: const Icon(
 Icons.play_circle_outline_rounded,

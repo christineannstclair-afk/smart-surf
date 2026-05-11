@@ -369,6 +369,19 @@ class HomeScreenState extends State<HomeScreen> {
                     children: [
 
                       // 1) Header Area (Profile)
+                // Dashboard helper card repositioned above profile card
+                HelperInfoCard(
+                  prefKey: 'hasSeenDashboardGuide',
+                  visible: widget.sessionsSurfed <= 2 && !widget.seenDashboardPrompt,
+                  onDismiss: widget.onPromptDismissed,
+                  message: _t(
+                    "This is your surf dashboard. Log sessions, track your progress, and build your surf identity.",
+                    "Este es tu dashboard de surf. Registra sesiones, sigue tu progreso y construye tu identidad de surf.",
+                  ),
+                  dismissLabel: _t("Got it", "Entendido"),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                ),
+                
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.md),
                   child: ProfileSummaryCard(
@@ -485,19 +498,6 @@ class HomeScreenState extends State<HomeScreen> {
                       FirebaseService().saveFullProfile(data);
                     },
                   ),
-                ),
-                
-                // Dashboard helper card repositioned here
-                HelperInfoCard(
-                  prefKey: 'hasSeenDashboardGuide',
-                  visible: widget.sessionsSurfed <= 2 && !widget.seenDashboardPrompt,
-                  onDismiss: widget.onPromptDismissed,
-                  message: _t(
-                    "This is your surf dashboard. Log sessions, track your progress, and build your surf identity.",
-                    "Este es tu dashboard de surf. Registra sesiones, sigue tu progreso y construye tu identidad de surf.",
-                  ),
-                  dismissLabel: _t("Got it", "Entendido"),
-                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
                 ),
 
                 if (widget.displayName.isEmpty && widget.stance.isEmpty && widget.height.isEmpty && widget.weight.isEmpty && widget.location.isEmpty && widget.age.isEmpty && widget.surferSummary.isEmpty)
@@ -1020,8 +1020,6 @@ class HomeScreenState extends State<HomeScreen> {
     final String subtext = teaserText ?? latestNextFocus ?? (widget.sessionsSurfed == 0 
         ? _t("Log your first surf and see what your surfing is really telling you.", "Registra tu primer surf y mira lo que tu surf realmente te está diciendo.")
         : _t("Log your next session and keep building your rhythm.", "Registra tu próxima sesión y mantén tu ritmo."));
-    
-    final bool showLockedTeaser = !widget.isSurferPro && (teaserText != null);
 
     return PulseAnimator(
       play: _playPulse,
@@ -1076,39 +1074,12 @@ class HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 12),
                   Text(
                     subtext,
-                    style: showLockedTeaser
-                      ? TextStyle(
-                          fontSize: 15,
-                          height: 1.5,
-                          // foreground only — color must be null when foreground is set
-                          foreground: Paint()
-                            ..shader = ui.Gradient.linear(
-                              const Offset(0, 0),
-                              const Offset(0, 40),
-                              [Colors.white.withOpacity(0.9), Colors.white.withOpacity(0.0)],
-                            ),
-                        )
-                      : const TextStyle(
-                          fontSize: 15,
-                          color: AppTheme.textMuted,
-                          height: 1.5,
-                        ),
-                    maxLines: showLockedTeaser ? 2 : null,
-                    overflow: showLockedTeaser ? TextOverflow.clip : null,
-                  ),
-                  if (showLockedTeaser) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(Icons.lock_outline, size: 14, color: AppTheme.primary),
-                        const SizedBox(width: 6),
-                        Text(
-                          _t("See your full progress insight", "Ver tu insight de progreso completo"),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.primary),
-                        ),
-                      ],
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: AppTheme.textMuted,
+                      height: 1.5,
                     ),
-                  ],
+                  ),
                   const SizedBox(height: 24),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
