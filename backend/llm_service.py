@@ -204,7 +204,7 @@ Write the response now. Follow all tone and structure rules.
     import hashlib
     prompt_hash = hashlib.md5(active_prompt.encode()).hexdigest()[:8]
 
-    print(f"[LLM] Reflection request prepared. Mode={prompt_mode}, prompt_hash={prompt_hash})
+    print(f"[LLM] Reflection request prepared. Mode={prompt_mode}, prompt_hash={prompt_hash}")
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
