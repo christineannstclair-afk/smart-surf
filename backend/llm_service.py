@@ -150,10 +150,8 @@ def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: s
     reflection_fields = [n_felt_good, n_felt_hard, normalize(worked_on), normalize(notes), normalize(conditions)]
     filled = sum(1 for f in reflection_fields if f != "")
     
-    print(f"\n[DataAudit] reflectionGood normalized: {n_felt_good!r}")
-    print(f"[DataAudit] reflectionOff normalized: {n_felt_hard!r}")
-    print(f"[DataAudit] focusSkill: {n_focus!r}")
-    
+    # Do not log surfer-provided reflection text or session details.
+
     if filled == 0:
         data_richness = "THIN"
     elif filled <= 2:
@@ -184,7 +182,7 @@ def generate_reflection(focus: str, worked_on: str, felt_hard: str, felt_good: s
             for s in history[:3]
         ]) + "\n\n"
     
-    print(f"\n[DataAudit] history_text sent to LLM:\n{history_text}")
+
 
     user_content = f"""
 {history_text}DATA_RICHNESS: {data_richness}
@@ -206,15 +204,7 @@ Write the response now. Follow all tone and structure rules.
     import hashlib
     prompt_hash = hashlib.md5(active_prompt.encode()).hexdigest()[:8]
 
-    print("\n" + "="*60)
-    print("SMART SURF — PROMPT SENT TO OPENAI")
-    print("="*60)
-    print(f"MODEL: gpt-4o-mini | TEMPERATURE: 0.4 | PROMPT HASH: {prompt_hash} | MODE: {prompt_mode}")
-    print("-"*60)
-    print("ACTIVE SYSTEM PROMPT:\n", active_prompt.strip())
-    print("-"*60)
-    print("USER MESSAGE:\n", user_content)
-    print("="*60 + "\n")
+    print(f"[LLM] Reflection request prepared. Mode={prompt_mode}, prompt_hash={prompt_hash})
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -305,7 +295,7 @@ Write the response now. Follow all tone and structure rules.
             return parsed_1
         
         # ATTEMPT 2: RETRY with repair prompt
-        print(f"[AI_PARSE_FAILED_RETRYING] Content was: {raw_1[:100]}...")
+        print("[AI_PARSE_FAILED_RETRYING] Retrying structured response validation.")
         repair_prompt = f"""
         Your previous response was missing required fields or was malformed.
         Return a valid JSON object with EXACTLY these keys and non-empty values:
@@ -332,7 +322,7 @@ Write the response now. Follow all tone and structure rules.
             return parsed_2
             
     except Exception as e:
-        print(f"[LLM] Connection or API error: {e}")
+        print(f"[LLM] Provider request failed ({type(e).__name__}).")
 
     # If we reached here, both custom and retry attempts failed.
     # The user now explicitly wants an error instead of a fallback.
